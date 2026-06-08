@@ -23,7 +23,7 @@ import numpy as np
 import pandas as pd
 from sklearn.preprocessing import MinMaxScaler
 
-from lstm_predictor import add_indicators
+from lstm_predictor import add_indicators, inverse_close
 
 import tensorflow as tf
 from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
@@ -85,13 +85,6 @@ def build_model(cfg: dict, lookback: int) -> Sequential:
     model.add(Dense(1))
     model.compile(optimizer=tf.keras.optimizers.Adam(cfg["learning_rate"]), loss="mse")
     return model
-
-
-def inverse_close(scaler, vals):
-    n = scaler.scale_.shape[0]
-    dummy = np.zeros((len(vals), n), dtype=np.float32)
-    dummy[:, 0] = np.array(vals).flatten()
-    return scaler.inverse_transform(dummy)[:, 0]
 
 
 def predict_ticker(ticker: str, cfg: dict) -> dict | None:

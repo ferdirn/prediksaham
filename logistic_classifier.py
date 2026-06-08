@@ -15,7 +15,6 @@ Usage:
 """
 
 import argparse
-import json
 import sqlite3
 from datetime import date
 from pathlib import Path
@@ -28,6 +27,8 @@ import pandas as pd
 from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler
 
+from utils import load_watchlist, load_config_json
+
 SQLITE_PATH    = "bei_stocks.db"
 LR_CLS_CONFIGS = "logistic_configs.json"
 WATCHLIST      = "watchlist.txt"
@@ -36,17 +37,7 @@ DEFAULT_CONFIG = {"lookback": 3, "C": 1.0}
 
 
 def load_config(ticker: str) -> dict:
-    path = Path(LR_CLS_CONFIGS)
-    if path.exists():
-        configs = json.loads(path.read_text())
-        if ticker in configs:
-            return configs[ticker]
-    return DEFAULT_CONFIG.copy()
-
-
-def load_watchlist() -> list[str]:
-    lines = Path(WATCHLIST).read_text().splitlines()
-    return [l.strip() for l in lines if l.strip() and not l.startswith("#")]
+    return load_config_json(LR_CLS_CONFIGS, ticker, DEFAULT_CONFIG.copy())
 
 
 def load_data(ticker: str) -> pd.DataFrame:

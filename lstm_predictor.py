@@ -176,7 +176,9 @@ def save_ticker_config(ticker: str, cfg: dict):
 # DATA LOADING
 # ──────────────────────────────────────────────
 
-def load_data(ticker: str, db_path: str = SQLITE_PATH) -> pd.DataFrame:
+def load_data(ticker: str, db_path: str = SQLITE_PATH,
+              features: list[str] = None) -> pd.DataFrame:
+    features = features or FEATURES
     conn = sqlite3.connect(db_path)
     df = pd.read_sql_query(
         "SELECT Date, Close, Open, High, Low, Volume, GainLoss_Pct, DayReturn_Pct "
@@ -194,7 +196,7 @@ def load_data(ticker: str, db_path: str = SQLITE_PATH) -> pd.DataFrame:
     df = add_indicators(df)
 
     # Drop NaN rows produced by rolling windows (first ~20 rows)
-    df.dropna(subset=FEATURES, inplace=True)
+    df.dropna(subset=features, inplace=True)
 
     print(f"  Loaded {len(df)} rows for {ticker}  ({df.index[0].date()} → {df.index[-1].date()})")
     return df
@@ -242,8 +244,8 @@ def make_sequences(data: np.ndarray, lookback: int, forecast: int):
 
 
 def preprocess(df: pd.DataFrame, lookback: int, forecast: int, train_split: float,
-               train_all: bool = False):
-    feature_data = df[FEATURES].values.astype(np.float32)
+               train_all: bool = False, features: list[str] = None):
+    feature_data = df[features or FEATURES].values.astype(np.float32)
     dates_all    = df.index.to_numpy()
     split_idx    = int(len(feature_data) * (1.0 - train_split if train_all else train_split))
 
@@ -282,11 +284,12 @@ def preprocess(df: pd.DataFrame, lookback: int, forecast: int, train_split: floa
     return X_train, y_train, X_test, y_test, scaler, train_dates, test_dates
 
 
-def inverse_close(scaler: MinMaxScaler, scaled_values: np.ndarray) -> np.ndarray:
+def inverse_close(scaler: MinMaxScaler, scaled_values) -> np.ndarray:
     """Inverse-transform only the Close column (col 0)."""
+    vals = np.asarray(scaled_values).flatten()
     n_features = scaler.scale_.shape[0]
-    dummy = np.zeros((len(scaled_values), n_features), dtype=np.float32)
-    dummy[:, 0] = scaled_values.flatten()
+    dummy = np.zeros((len(vals), n_features), dtype=np.float32)
+    dummy[:, 0] = vals
     return scaler.inverse_transform(dummy)[:, 0]
 
 
@@ -294,23 +297,26 @@ def inverse_close(scaler: MinMaxScaler, scaled_values: np.ndarray) -> np.ndarray
 # MODEL
 # ──────────────────────────────────────────────
 
-def build_model(lookback: int, n_features: int, forecast: int) -> Sequential:
+def build_model(lookback: int, n_features: int, forecast: int,
+                lstm_units: int = LSTM_UNITS, num_layers: int = NUM_LAYERS,
+                dropout: float = DROPOUT, dense_units: int = DENSE_UNITS,
+                learning_rate: float = LEARNING_RATE) -> Sequential:
     model = Sequential(name="BEI_LSTM")
 
-    for i in range(NUM_LAYERS):
-        return_seq = (i < NUM_LAYERS - 1)  # all layers except last return sequences
+    for i in range(num_layers):
+        return_seq = (i < num_layers - 1)
         if i == 0:
-            model.add(LSTM(LSTM_UNITS, return_sequences=return_seq,
+            model.add(LSTM(lstm_units, return_sequences=return_seq,
                            input_shape=(lookback, n_features)))
         else:
-            model.add(LSTM(LSTM_UNITS, return_sequences=return_seq))
-        model.add(Dropout(DROPOUT))
+            model.add(LSTM(lstm_units, return_sequences=return_seq))
+        model.add(Dropout(dropout))
 
-    model.add(Dense(DENSE_UNITS, activation="relu"))
+    model.add(Dense(dense_units, activation="relu"))
     model.add(Dense(forecast))
 
     model.compile(
-        optimizer=tf.keras.optimizers.Adam(learning_rate=LEARNING_RATE),
+        optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
         loss="mse",
         metrics=["mae"]
     )
@@ -334,9 +340,9 @@ def evaluate(y_true: np.ndarray, y_pred: np.ndarray, label: str = "Test"):
 # ──────────────────────────────────────────────
 
 def save_plot(ticker: str, train_dates, train_actual, test_dates, test_actual, test_pred,
-              history, output_dir: Path):
+              history, output_dir: Path, lookback: int = LOOKBACK):
     fig, axes = plt.subplots(2, 1, figsize=(14, 9))
-    fig.suptitle(f"{ticker} — LSTM Price Prediction  (lookback={LOOKBACK})", fontsize=14)
+    fig.suptitle(f"{ticker} — LSTM Price Prediction  (lookback={lookback})", fontsize=14)
 
     # ── price chart ──
     ax = axes[0]
@@ -367,46 +373,75 @@ def save_plot(ticker: str, train_dates, train_actual, test_dates, test_actual, t
 # MAIN PIPELINE
 # ──────────────────────────────────────────────
 
+def _resolve_config(ticker: str, lookback: int, forecast: int, epochs: int,
+                    train_split_override: float | None) -> dict:
+    """Merge CLI args with saved ticker config; CLI args act as defaults only."""
+    cfg = load_ticker_config(ticker)
+    return {
+        "features"      : cfg.get("features",       FEATURES),
+        "lookback"      : cfg.get("lookback",        lookback),
+        "forecast"      : cfg.get("forecast",        forecast),
+        "epochs"        : cfg.get("epochs",          epochs),
+        "patience"      : cfg.get("patience",        PATIENCE),
+        "seed"          : cfg.get("seed",            SEED),
+        "lstm_units"    : cfg.get("lstm_units",      LSTM_UNITS),
+        "num_layers"    : cfg.get("num_layers",      NUM_LAYERS),
+        "dropout"       : cfg.get("dropout",         DROPOUT),
+        "dense_units"   : cfg.get("dense_units",     DENSE_UNITS),
+        "batch_size"    : cfg.get("batch_size",      BATCH_SIZE),
+        "learning_rate" : cfg.get("learning_rate",   LEARNING_RATE),
+        "train_split"   : train_split_override if train_split_override is not None
+                          else cfg.get("train_split", TRAIN_SPLIT),
+    }
+
+
+def _forecast_next(model, scaler, df: pd.DataFrame, features: list[str],
+                   lookback: int, forecast: int) -> np.ndarray:
+    last_seq = df[features].values[-lookback:].astype(np.float32)
+    last_seq_scaled = scaler.transform(last_seq).reshape(1, lookback, len(features))
+    next_pred_scaled = model.predict(last_seq_scaled, verbose=0)
+    dummy = np.zeros((forecast, scaler.scale_.shape[0]), dtype=np.float32)
+    dummy[:, 0] = next_pred_scaled[0]
+    return scaler.inverse_transform(dummy)[:, 0]
+
+
+def _print_forecast(ticker: str, df: pd.DataFrame, next_prices: np.ndarray) -> None:
+    last_close = df["Close"].iloc[-1]
+    last_date  = df.index[-1].date()
+    label_close = f"Last close  ({last_date})"
+    col_width   = max(len(label_close),
+                      max(len(f"Forecast +{i}d") for i in range(1, len(next_prices) + 1)))
+    print(f"\n{'─'*56}")
+    print(f"  {ticker}")
+    print(f"  {label_close:<{col_width}} : IDR {last_close:,.0f}")
+    for i, price in enumerate(next_prices, 1):
+        change_pct = (price - last_close) / last_close * 100
+        direction  = "▲" if price >= last_close else "▼"
+        print(f"  {'Forecast +' + str(i) + 'd':<{col_width}} : IDR {price:,.0f}  {direction} {change_pct:+.2f}%")
+    print(f"{'─'*56}\n")
+
+
 def run(ticker: str, lookback: int, forecast: int, epochs: int, db_path: str,
         verbose: bool = False, train_all: bool = False,
         train_split_override: float = None):
-    global FEATURES, LOOKBACK, FORECAST, EPOCHS, PATIENCE, SEED
-    global LSTM_UNITS, NUM_LAYERS, DROPOUT, DENSE_UNITS, BATCH_SIZE, LEARNING_RATE, TRAIN_SPLIT
+    c = _resolve_config(ticker, lookback, forecast, epochs, train_split_override)
 
-    # Override defaults with saved ticker config (if available)
-    cfg = load_ticker_config(ticker)
-    if cfg:
-        FEATURES      = cfg.get("features",       FEATURES)
-        lookback      = cfg.get("lookback",        lookback)
-        forecast      = cfg.get("forecast",        forecast)
-        epochs        = cfg.get("epochs",          epochs)
-        PATIENCE      = cfg.get("patience",        PATIENCE)
-        SEED          = cfg.get("seed",            SEED)
-        LSTM_UNITS    = cfg.get("lstm_units",      LSTM_UNITS)
-        NUM_LAYERS    = cfg.get("num_layers",      NUM_LAYERS)
-        DROPOUT       = cfg.get("dropout",         DROPOUT)
-        DENSE_UNITS   = cfg.get("dense_units",     DENSE_UNITS)
-        BATCH_SIZE    = cfg.get("batch_size",      BATCH_SIZE)
-        LEARNING_RATE = cfg.get("learning_rate",   LEARNING_RATE)
-        TRAIN_SPLIT   = cfg.get("train_split",     TRAIN_SPLIT)
-
-    if train_split_override is not None:
-        TRAIN_SPLIT = train_split_override
-
-    mode_label = "train_all=True (seluruh data)" if train_all else f"train_split={TRAIN_SPLIT}"
+    mode_label = "train_all=True (seluruh data)" if train_all else f"train_split={c['train_split']}"
     print(f"\n{'═'*56}")
     print(f"  BEI LSTM Predictor — {ticker}")
-    print(f"  lookback={lookback}  forecast={forecast}  epochs={epochs}  seed={SEED}")
-    print(f"  features={FEATURES}")
+    print(f"  lookback={c['lookback']}  forecast={c['forecast']}  epochs={c['epochs']}  seed={c['seed']}")
+    print(f"  features={c['features']}")
     print(f"  mode={mode_label}")
     print(f"{'═'*56}\n")
 
     # 1. Load
-    df = load_data(ticker, db_path)
+    df = load_data(ticker, db_path, features=c["features"])
 
     # 2. Preprocess
-    X_train, y_train, X_test, y_test, scaler, train_dates, test_dates = \
-        preprocess(df, lookback, forecast, TRAIN_SPLIT, train_all=train_all)
+    X_train, y_train, X_test, y_test, scaler, train_dates, test_dates = preprocess(
+        df, c["lookback"], c["forecast"], c["train_split"],
+        train_all=train_all, features=c["features"],
+    )
 
     print(f"  Train sequences : {len(X_train)}")
     print(f"  Test  sequences : {len(X_test)}")
@@ -416,17 +451,22 @@ def run(ticker: str, lookback: int, forecast: int, epochs: int, db_path: str,
         print("  Run bei_stock_downloader.py with --years 5 to get more data.\n")
 
     # 3. Build
-    model = build_model(lookback, len(FEATURES), forecast)
+    model = build_model(
+        c["lookback"], len(c["features"]), c["forecast"],
+        lstm_units=c["lstm_units"], num_layers=c["num_layers"],
+        dropout=c["dropout"], dense_units=c["dense_units"],
+        learning_rate=c["learning_rate"],
+    )
     if verbose:
         model.summary()
 
     # 4. Train
     v = int(verbose)
     callbacks = [
-        EarlyStopping(monitor="val_loss", patience=PATIENCE, restore_best_weights=True,
-                      verbose=v),
-        ReduceLROnPlateau(monitor="val_loss", factor=0.5, patience=7, min_lr=1e-6,
-                          verbose=v),
+        EarlyStopping(monitor="val_loss", patience=c["patience"],
+                      restore_best_weights=True, verbose=v),
+        ReduceLROnPlateau(monitor="val_loss", factor=0.5, patience=7,
+                          min_lr=1e-6, verbose=v),
     ]
     spinner = Spinner() if not verbose else None
     if spinner:
@@ -435,8 +475,8 @@ def run(ticker: str, lookback: int, forecast: int, epochs: int, db_path: str,
 
     history = model.fit(
         X_train, y_train,
-        epochs=epochs,
-        batch_size=BATCH_SIZE,
+        epochs=c["epochs"],
+        batch_size=c["batch_size"],
         validation_split=0.1,
         callbacks=callbacks,
         verbose=v,
@@ -459,34 +499,14 @@ def run(ticker: str, lookback: int, forecast: int, epochs: int, db_path: str,
     evaluate(test_actual,  test_pred,  label="Test ")
 
     # 7. Next-day forecast
-    last_seq = df[FEATURES].values[-lookback:].astype(np.float32)
-    last_seq_scaled = scaler.transform(last_seq).reshape(1, lookback, len(FEATURES))
-    next_pred_scaled = model.predict(last_seq_scaled, verbose=0)
-
-    dummy = np.zeros((forecast, scaler.scale_.shape[0]), dtype=np.float32)
-    dummy[:, 0] = next_pred_scaled[0]
-    next_prices = scaler.inverse_transform(dummy)[:, 0]
-
-    last_close  = df["Close"].iloc[-1]
-    last_date   = df.index[-1].date()
-    label_close = f"Last close  ({last_date})"
-    col_width   = max(len(label_close), max(len(f"Forecast +{i}d") for i in range(1, forecast + 1)))
-
-    print(f"\n{'─'*56}")
-    print(f"  {ticker}")
-    print(f"  {label_close:<{col_width}} : IDR {last_close:,.0f}")
-    for i, price in enumerate(next_prices, 1):
-        change_pct  = (price - last_close) / last_close * 100
-        direction   = "▲" if price >= last_close else "▼"
-        label_fore  = f"Forecast +{i}d"
-        print(f"  {label_fore:<{col_width}} : IDR {price:,.0f}  {direction} {change_pct:+.2f}%")
-    print(f"{'─'*56}\n")
+    next_prices = _forecast_next(model, scaler, df, c["features"], c["lookback"], c["forecast"])
+    _print_forecast(ticker, df, next_prices)
 
     # 8. Save plot
     output_dir = Path("prediction_images")
     output_dir.mkdir(exist_ok=True)
     save_plot(ticker, train_dates, train_actual, test_dates, test_actual, test_pred,
-              history, output_dir)
+              history, output_dir, lookback=c["lookback"])
 
     return model, scaler, history
 
@@ -574,19 +594,6 @@ Contoh:
 
     if args.save_config:
         from datetime import date
-        save_ticker_config(args.ticker, {
-            "lookback":      args.lookback,
-            "forecast":      args.forecast,
-            "epochs":        args.epochs,
-            "patience":      PATIENCE,
-            "seed":          SEED,
-            "features":      FEATURES,
-            "lstm_units":    LSTM_UNITS,
-            "num_layers":    NUM_LAYERS,
-            "dropout":       DROPOUT,
-            "dense_units":   DENSE_UNITS,
-            "batch_size":    BATCH_SIZE,
-            "learning_rate": LEARNING_RATE,
-            "train_split":   TRAIN_SPLIT,
-            "last_updated":  str(date.today()),
-        })
+        c = _resolve_config(args.ticker, args.lookback, args.forecast,
+                            args.epochs, args.train_split)
+        save_ticker_config(args.ticker, {**c, "last_updated": str(date.today())})

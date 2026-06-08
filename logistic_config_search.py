@@ -22,7 +22,6 @@ Usage:
 """
 
 import argparse
-import json
 import sqlite3
 from datetime import date
 from pathlib import Path
@@ -36,7 +35,10 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import TimeSeriesSplit
 from sklearn.preprocessing import StandardScaler
 
-SQLITE_PATH  = "bei_stocks.db"
+from logistic_classifier import build_features, load_jkse
+from utils import save_configs as _save_configs
+
+SQLITE_PATH    = "bei_stocks.db"
 LR_CLS_CONFIGS = "logistic_configs.json"
 
 DEFAULT_LOOKBACKS = [1, 2, 3, 5, 7, 10, 14]
@@ -62,54 +64,6 @@ def load_data(ticker: str) -> pd.DataFrame:
     df["Date"] = pd.to_datetime(df["Date"])
     df.set_index("Date", inplace=True)
     return df
-
-
-def load_jkse() -> pd.Series:
-    conn = sqlite3.connect(SQLITE_PATH)
-    df   = pd.read_sql_query(
-        "SELECT Date, DayReturn_Pct FROM daily_prices WHERE Ticker = '^JKSE' ORDER BY Date ASC",
-        conn
-    )
-    conn.close()
-    df["Date"] = pd.to_datetime(df["Date"])
-    df.set_index("Date", inplace=True)
-    return df["DayReturn_Pct"].rename("jkse")
-
-
-def build_features(df: pd.DataFrame, jkse: pd.Series,
-                   lookback: int) -> tuple[pd.DataFrame, pd.Series]:
-    feat = {}
-
-    # Return lags
-    for lag in range(1, lookback + 1):
-        feat[f"ret_lag{lag}"] = df["DayReturn_Pct"].shift(lag)
-
-    # Volume % change lags (lebih informatif dari volume absolut)
-    vol_chg = df["Volume"].replace(0, np.nan).pct_change() * 100
-    for lag in range(1, lookback + 1):
-        feat[f"volchg_lag{lag}"] = vol_chg.shift(lag)
-
-    # Momentum: jumlah return N hari terakhir
-    feat["momentum_3"] = df["DayReturn_Pct"].shift(1).rolling(3).sum()
-    feat["momentum_5"] = df["DayReturn_Pct"].shift(1).rolling(5).sum()
-
-    # Volatilitas: besar return kemarin
-    feat["abs_ret_lag1"] = df["DayReturn_Pct"].shift(1).abs()
-
-    # Konteks pasar: return JKSE kemarin
-    feat["jkse_lag1"] = jkse.shift(1).reindex(df.index)
-
-    feat_df = pd.DataFrame(feat, index=df.index)
-
-    # Target: 1 = naik, 0 = turun — singkirkan hari flat (data artifact)
-    target  = (df["DayReturn_Pct"] > 0).astype(int)
-    feat_df["target"] = target
-    feat_df = feat_df[df["DayReturn_Pct"] != 0]
-    feat_df.dropna(inplace=True)
-
-    X = feat_df.drop(columns=["target"])
-    y = feat_df["target"]
-    return X, y
 
 
 def cv_score(X: pd.DataFrame, y: pd.Series, c: float) -> float:
@@ -173,13 +127,7 @@ def search_ticker(ticker: str, jkse: pd.Series,
 
 
 def save_configs(updates: dict[str, dict]) -> None:
-    path    = Path(LR_CLS_CONFIGS)
-    configs = json.loads(path.read_text()) if path.exists() else {}
-    configs.update(updates)
-    tmp = path.with_suffix(".tmp")
-    tmp.write_text(json.dumps(configs, indent=2))
-    tmp.replace(path)
-    print(f"\n  Config disimpan → {LR_CLS_CONFIGS}")
+    _save_configs(LR_CLS_CONFIGS, updates)
 
 
 if __name__ == "__main__":

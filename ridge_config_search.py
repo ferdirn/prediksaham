@@ -17,7 +17,6 @@ Usage:
 """
 
 import argparse
-import json
 import sqlite3
 from datetime import date
 from pathlib import Path
@@ -28,6 +27,8 @@ from sklearn.linear_model import Ridge
 from sklearn.metrics import mean_absolute_error
 from sklearn.model_selection import TimeSeriesSplit
 from sklearn.preprocessing import StandardScaler
+
+from utils import save_configs as _save_configs
 
 SQLITE_PATH = "bei_stocks.db"
 LR_CONFIGS  = "ridge_configs.json"
@@ -129,13 +130,7 @@ def search_ticker(ticker: str, lookbacks: list[int], alphas: list[float]) -> dic
 
 
 def save_configs(updates: dict[str, dict]) -> None:
-    path = Path(LR_CONFIGS)
-    configs = json.loads(path.read_text()) if path.exists() else {}
-    configs.update(updates)
-    tmp = path.with_suffix(".tmp")
-    tmp.write_text(json.dumps(configs, indent=2))
-    tmp.replace(path)
-    print(f"\n  Config disimpan → {LR_CONFIGS}")
+    _save_configs(LR_CONFIGS, updates)
 
 
 if __name__ == "__main__":
