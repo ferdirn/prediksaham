@@ -1,6 +1,6 @@
 {
   "BBCA": {
-    "lookback": 48,
+    "lookback": 14,
     "forecast": 1,
     "epochs": 300,
     "patience": 25,
@@ -18,11 +18,15 @@
     "batch_size": 32,
     "learning_rate": 0.001,
     "train_split": 0.8,
-    "notes": "Best config dari feature search. Test MAPE 1.53%, MAE 111 IDR. OHLC raw tidak membantu, indikator teknikal (MA/RSI/ATR) redundan karena lookback=48 sudah mencakupnya implisit.",
-    "last_updated": "2026-06-04"
+    "search_mape": 1.5441,
+    "search_mae": 111.79,
+    "search_rmse": 160.28,
+    "data_rows": 1202,
+    "notes": "Best from lookback search 3\u201360, seed=42",
+    "last_updated": "2026-06-08"
   },
   "ANTM": {
-    "lookback": 28,
+    "lookback": 3,
     "forecast": 1,
     "epochs": 300,
     "patience": 25,
@@ -40,12 +44,12 @@
     "batch_size": 32,
     "learning_rate": 0.001,
     "train_split": 0.8,
-    "search_mape": 2.9023,
-    "search_mae": 100.69,
-    "search_rmse": 134.99,
-    "data_rows": 1200,
+    "search_mape": 2.9325,
+    "search_mae": 100.91,
+    "search_rmse": 137.82,
+    "data_rows": 1202,
     "notes": "Best from lookback search 3\u201360, seed=42",
-    "last_updated": "2026-06-04"
+    "last_updated": "2026-06-08"
   },
   "CLEO": {
     "lookback": 12,
@@ -66,12 +70,12 @@
     "batch_size": 32,
     "learning_rate": 0.001,
     "train_split": 0.8,
-    "search_mape": 1.8923,
-    "search_mae": 9.78,
-    "search_rmse": 14.12,
-    "data_rows": 1199,
+    "search_mape": 2.0895,
+    "search_mae": 10.48,
+    "search_rmse": 14.53,
+    "data_rows": 1202,
     "notes": "Best from lookback search 3\u201360, seed=42",
-    "last_updated": "2026-06-05"
+    "last_updated": "2026-06-08"
   },
   "MPMX": {
     "lookback": 3,
@@ -92,15 +96,15 @@
     "batch_size": 32,
     "learning_rate": 0.001,
     "train_split": 0.8,
-    "search_mape": 0.6794,
-    "search_mae": 6.76,
-    "search_rmse": 11.25,
-    "data_rows": 1199,
+    "search_mape": 0.6888,
+    "search_mae": 6.88,
+    "search_rmse": 11.34,
+    "data_rows": 1202,
     "notes": "Best from lookback search 3\u201360, seed=42",
-    "last_updated": "2026-06-05"
+    "last_updated": "2026-06-08"
   },
   "DMAS": {
-    "lookback": 14,
+    "lookback": 7,
     "forecast": 1,
     "epochs": 300,
     "patience": 25,
@@ -118,12 +122,12 @@
     "batch_size": 32,
     "learning_rate": 0.001,
     "train_split": 0.8,
-    "search_mape": 0.8766,
-    "search_mae": 1.22,
-    "search_rmse": 1.78,
-    "data_rows": 1199,
+    "search_mape": 0.8884,
+    "search_mae": 1.24,
+    "search_rmse": 1.81,
+    "data_rows": 1202,
     "notes": "Best from lookback search 3\u201360, seed=42",
-    "last_updated": "2026-06-05"
+    "last_updated": "2026-06-09"
   },
   "SUNI": {
     "lookback": 3,
@@ -144,15 +148,15 @@
     "batch_size": 32,
     "learning_rate": 0.001,
     "train_split": 0.8,
-    "search_mape": 1.3717,
-    "search_mae": 10.18,
-    "search_rmse": 14.4,
-    "data_rows": 803,
+    "search_mape": 1.3687,
+    "search_mae": 10.14,
+    "search_rmse": 14.27,
+    "data_rows": 806,
     "notes": "Best from lookback search 3\u201360, seed=42",
-    "last_updated": "2026-06-05"
+    "last_updated": "2026-06-09"
   },
   "INET": {
-    "lookback": 12,
+    "lookback": 19,
     "forecast": 1,
     "epochs": 300,
     "patience": 25,
@@ -170,22 +174,21 @@
     "batch_size": 32,
     "learning_rate": 0.001,
     "train_split": 0.8,
-    "search_mape": 7.9802,
-    "search_mae": 39.81,
-    "search_rmse": 64.35,
-    "data_rows": 680,
+    "search_mape": 8.5919,
+    "search_mae": 41.2,
+    "search_rmse": 64.11,
+    "data_rows": 683,
     "notes": "Best from lookback search 3\u201360, seed=42",
-    "last_updated": "2026-06-05"
+    "last_updated": "2026-06-09"
   },
   "^JKSE": {
-    "lookback": 11,
+    "lookback": 40,
     "forecast": 1,
     "epochs": 300,
     "patience": 25,
     "seed": 42,
     "features": [
       "Close",
-      "Volume",
       "GainLoss_Pct",
       "DayReturn_Pct"
     ],
@@ -196,12 +199,12 @@
     "batch_size": 32,
     "learning_rate": 0.001,
     "train_split": 0.8,
-    "search_mape": 1.4223,
-    "search_mae": 110.82,
-    "search_rmse": 138.92,
-    "data_rows": 1197,
+    "search_mape": 1.4243,
+    "search_mae": 110.31,
+    "search_rmse": 137.09,
+    "data_rows": 1198,
     "notes": "Best from lookback search 3\u201360, seed=42",
-    "last_updated": "2026-06-05"
+    "last_updated": "2026-06-08"
   },
   "WIFI": {
     "lookback": 3,
@@ -222,11 +225,11 @@
     "batch_size": 32,
     "learning_rate": 0.001,
     "train_split": 0.8,
-    "search_mape": 4.0918,
-    "search_mae": 112.19,
-    "search_rmse": 162.48,
-    "data_rows": 1201,
+    "search_mape": 4.3006,
+    "search_mae": 116.62,
+    "search_rmse": 170.65,
+    "data_rows": 1202,
     "notes": "Best from lookback search 3\u201360, seed=42",
-    "last_updated": "2026-06-05"
+    "last_updated": "2026-06-09"
   }
 }

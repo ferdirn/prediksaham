@@ -4,9 +4,14 @@ BEI Stock Data Viewer
 Menampilkan N data terakhir untuk satu ticker dari bei_stocks.db.
 
 Usage:
-    python peek.py BBCA
-    python peek.py BBCA --rows 20
-    python peek.py BBCA --rows 5
+    python stock_viewer.py BBCA
+    python stock_viewer.py BBCA --data 20
+    python stock_viewer.py BBCA --data 5
+
+Kolom yang ditampilkan:
+    Date, Open, High, Low, Close, Volume, GainLoss_Pct, DayReturn_Pct, IntraDay_Range
+
+Default: 10 baris terakhir, diurutkan ascending (terlama → terbaru).
 """
 
 import argparse

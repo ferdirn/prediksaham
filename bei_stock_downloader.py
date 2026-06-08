@@ -2,18 +2,26 @@
 BEI (Bursa Efek Indonesia) Stock Historical Data Downloader
 ============================================================
 Downloads daily OHLCV + derived metrics for BEI stocks via Yahoo Finance.
-Stores data in SQLite (bei_stocks.db).
+Stores data in SQLite (bei_stocks.db). Upserts are idempotent — safe to
+re-run at any time without creating duplicate rows.
 
 Usage:
     Default (all watchlist, 5 years): python bei_stock_downloader.py
     Single ticker                    : python bei_stock_downloader.py --ticker BBCA --days 30
-    Multiple tickers                 : python bei_stock_downloader.py --ticker BBCA TLKM GOTO --days 14
-    From file                        : python bei_stock_downloader.py --file watchlist.txt --days 30
+    Multiple tickers                 : python bei_stock_downloader.py --tickers BBCA TLKM GOTO --days 14
+    From watchlist file              : python bei_stock_downloader.py --file watchlist.txt --days 30
     By years                         : python bei_stock_downloader.py --ticker BBCA --years 3
 
 Defaults:
     --file  watchlist.txt
     --days  1825 (5 years)
+
+Notes:
+    - Ticker format: bare IDX code (BBCA, bukan BBCA.JK). Suffix .JK ditambahkan otomatis.
+    - Harga dalam IDR, auto-adjusted untuk stock split dan dividen.
+    - DayReturn_Pct pada baris pertama setiap batch selalu NaN (tidak ada baris sebelumnya).
+    - OHLC bisa NaN jika Yahoo Finance belum mempublikasikan data final hari tersebut.
+      Re-run setelah market tutup (15:00 WIB) untuk mendapatkan data lengkap.
 
 Requirements:
     pip install yfinance pandas
@@ -99,7 +107,19 @@ def to_yf_ticker(ticker: str) -> str:
     return ticker + ".JK"
 
 
-def download_stock(ticker: str, days: int) -> pd.DataFrame:
+def _get_prev_close(ticker: str, before_date: str, db_path: str) -> float | None:
+    """Return the most recent Close before before_date for ticker, or None if not in DB yet."""
+    conn = sqlite3.connect(db_path)
+    row = conn.execute(
+        "SELECT Close FROM daily_prices WHERE Ticker = ? AND Date < ? AND Close IS NOT NULL "
+        "ORDER BY Date DESC LIMIT 1",
+        (ticker.upper(), before_date)
+    ).fetchone()
+    conn.close()
+    return row[0] if row else None
+
+
+def download_stock(ticker: str, days: int, db_path: str = SQLITE_PATH) -> pd.DataFrame:
     """
     Download historical daily OHLCV data from Yahoo Finance
     and compute derived columns.
@@ -133,18 +153,42 @@ def download_stock(ticker: str, days: int) -> pd.DataFrame:
     df.reset_index(inplace=True)
     df["Date"] = df["Date"].dt.strftime("%Y-%m-%d")
 
+    # Drop rows where Close is NaN — yfinance sometimes returns phantom rows
+    # with volume-only data for the current trading day before market close
+    df = df.dropna(subset=["Close"])
+
+    if df.empty:
+        return df
+
     # ── Derived columns ──────────────────────────────────────────────────────
-    df["GainLoss_IDR"]    = (df["Close"] - df["Open"]).round(2)
-    df["GainLoss_Pct"]    = ((df["Close"] - df["Open"]) / df["Open"] * 100).round(4)
-    df["DayReturn_Pct"]   = df["Close"].pct_change().mul(100).round(4)   # vs prev close
-    df["IntraDay_Range"]  = (df["High"] - df["Low"]).round(2)
+    df["GainLoss_IDR"]   = (df["Close"] - df["Open"]).round(2)
+    df["GainLoss_Pct"]   = ((df["Close"] - df["Open"]) / df["Open"] * 100).round(4)
+    df["IntraDay_Range"] = (df["High"] - df["Low"]).round(2)
+
+    # DayReturn_Pct: anchor with last close from DB so the first row of every
+    # batch is never NULL — DB lookup handles weekends automatically (last
+    # trading day before the batch start, regardless of calendar gaps).
+    clean_ticker = ticker.upper().strip().replace(".JK", "")
+    prev_close = _get_prev_close(clean_ticker, df["Date"].iloc[0], db_path)
+    if prev_close is not None:
+        close_series = pd.concat(
+            [pd.Series([prev_close]), df["Close"].reset_index(drop=True)],
+            ignore_index=True,
+        )
+        df["DayReturn_Pct"] = close_series.pct_change().mul(100).round(4).iloc[1:].values
+    else:
+        df["DayReturn_Pct"] = df["Close"].pct_change().mul(100).round(4)
+
+    # Index tickers (e.g. ^JKSE) report volume=0 when unavailable — normalize to NULL.
+    if clean_ticker.startswith("^"):
+        df["Volume"] = df["Volume"].replace(0, None)
 
     # Frequency: Yahoo Finance free tier does not expose trade-count per day.
     # Leave as NULL. For real frequency data use: RTI Business / Stockbit Pro / IDX API.
-    df["Frequency"]  = None
+    df["Frequency"] = None
 
-    df["Ticker"]     = ticker.upper().strip().replace(".JK", "")
-    df["UpdatedAt"]  = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    df["Ticker"]    = clean_ticker
+    df["UpdatedAt"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     # Round OHLC
     for col in ["Open", "High", "Low", "Close"]:
@@ -244,7 +288,7 @@ def process_tickers(tickers: list, days: int):
         print(f"  {i}. {ticker}")
         print(f"{'─'*52}")
 
-        df = download_stock(ticker, days)
+        df = download_stock(ticker, days, db_path=SQLITE_PATH)
         if df.empty:
             continue
 

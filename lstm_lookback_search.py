@@ -2,8 +2,11 @@
 Lookback Hyperparameter Search
 ================================
 Trains an LSTM model for every lookback value in [start..end] and records
-Test MAE, RMSE, MAPE. Saves results to lookback_search_results.csv and
-plots the metric curves to lookback_search_<ticker>.png.
+Test MAE, RMSE, MAPE. Best config per ticker disimpan otomatis ke lstm_configs.json.
+
+Output:
+    ticker_configs_research/{TICKER}_lookback_search.csv  — metrik per lookback
+    ticker_configs_research/{TICKER}_lookback_search.png  — plot kurva MAPE/MAE/RMSE
 
 Usage:
     python lstm_lookback_search.py --ticker BBCA

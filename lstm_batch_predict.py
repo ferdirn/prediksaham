@@ -130,15 +130,15 @@ def predict_ticker(ticker: str, cfg: dict) -> dict | None:
         verbose=0,
     )
 
-    # Test MAPE
-    test_pred  = inverse_close(scaler, model.predict(X_test, verbose=0).flatten())
+    # Test MAPE — use model() directly to avoid shared predict tf.function retracing
+    test_pred  = inverse_close(scaler, model(tf.constant(X_test), training=False).numpy().flatten())
     test_actual = inverse_close(scaler, y_test)
     mape = float(np.mean(np.abs((test_actual - test_pred) / test_actual)) * 100)
 
     # Next-day forecast
-    last_seq   = raw[-lookback:]
+    last_seq    = raw[-lookback:]
     last_scaled = scaler.transform(last_seq).reshape(1, lookback, len(features))
-    next_scaled = model.predict(last_scaled, verbose=0)[0][0]
+    next_scaled = model(tf.constant(last_scaled), training=False).numpy()[0][0]
     next_price  = inverse_close(scaler, [next_scaled])[0]
 
     last_close  = df["Close"].iloc[-1]
@@ -146,8 +146,6 @@ def predict_ticker(ticker: str, cfg: dict) -> dict | None:
     change_idr  = next_price - last_close
     change_pct  = change_idr / last_close * 100
     direction   = "▲" if next_price >= last_close else "▼"
-
-    tf.keras.backend.clear_session()
 
     return {
         "ticker"     : ticker,
@@ -183,11 +181,15 @@ def run():
         else:
             print("FAILED")
 
+    # Clear TF session once after all tickers — not inside the loop, to avoid
+    # forcing a retrace on every subsequent model creation.
+    tf.keras.backend.clear_session()
+
     if not results:
         print("No results.")
         return
 
-    df = pd.DataFrame(results).sort_values("change_pct", ascending=False)
+    df = pd.DataFrame(results).sort_values("mape", ascending=True)
 
     print(f"\n{'═'*60}")
     print(f"  HASIL PREDIKSI BESOK — {date.today()}")
@@ -198,7 +200,7 @@ def run():
         arrow = "▲" if r["change_pct"] > 0 else "▼"
         print(f"  {r['ticker']:<6}  {r['last_close']:>11,.0f}  {r['forecast']:>10,.0f}  "
               f"{r['change_idr']:>+8,.0f}  {arrow}{abs(r['change_pct']):>7.2f}%  {r['mape']:>6.2f}%")
-    print(f"\n  Diurutkan: potensi kenaikan tertinggi → terendah")
+    print(f"\n  Diurutkan: MAPE terkecil → terbesar (akurasi model tertinggi di atas)")
     print(f"  MAPE = akurasi model pada data test historis")
     print(f"{'═'*60}\n")
 

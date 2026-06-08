@@ -11,6 +11,8 @@ Usage:
     python ridge_predictor.py --ticker DMAS
     python ridge_predictor.py --all
     python ridge_predictor.py --ticker ANTM --lookback 7 --alpha 0.1
+    python ridge_predictor.py --ticker DMAS --backtest 30
+    python ridge_predictor.py --ticker DMAS --backtest 30 --detail
 """
 
 import argparse
@@ -106,6 +108,7 @@ def predict_ticker(ticker: str, lookback_override: int | None = None,
     y_pred   = model.predict(X_test)
     mae      = mean_absolute_error(y_test, y_pred)
     dir_acc  = float(np.mean(np.sign(y_pred) == np.sign(y_test.values)) * 100)
+
 
     next_X           = build_next_features(df, lookback)
     next_X[vol_cols] = scaler.transform(next_X[vol_cols])
@@ -247,10 +250,10 @@ def print_summary(results: list[dict]) -> None:
         "MAE"       : r["mae"],
         "DirAcc"    : r["dir_acc"],
         "Lookback"  : r["lookback"],
-    } for r in results]).sort_values("Return Est", ascending=False)
+    } for r in results]).sort_values("MAE", ascending=True)
 
     print(f"\n{'═'*75}")
-    print(f"  PREDIKSI BESOK — {date.today()}  (Linear Regression)")
+    print(f"  PREDIKSI BESOK — {date.today()}  (Ridge Regression)")
     print(f"{'═'*75}")
     print(f"  {'Ticker':<7} {'Last Close':>11} {'Est. Close':>11} {'Return Est':>11} {'Arah':>4}  {'MAE':>7}  {'DirAcc':>7}  {'LB':>3}")
     print(f"  {'─'*7} {'─'*11} {'─'*11} {'─'*11} {'─'*4}  {'─'*7}  {'─'*7}  {'─'*3}")
@@ -259,7 +262,7 @@ def print_summary(results: list[dict]) -> None:
               f"{row['Return Est']:>+10.2f}% {row['Arah']:>4}  {row['MAE']:>6.2f}%  "
               f"{row['DirAcc']:>6.1f}%  {int(row['Lookback']):>3}")
     print(f"{'═'*75}")
-    print(f"  Diurutkan: potensi kenaikan tertinggi → terendah")
+    print(f"  Diurutkan: MAE terkecil → terbesar (akurasi model tertinggi di atas)")
     print(f"  MAE = error rata-rata prediksi return pada data test historis")
     print(f"  DirAcc = % prediksi arah (naik/turun) yang benar  |  LB = lookback")
     print(f"{'═'*75}\n")
@@ -289,10 +292,10 @@ if __name__ == "__main__":
             "  python ridge_predictor.py --ticker ANTM --lookback 7 --alpha 0.1\n"
         ),
     )
-    group = parser.add_mutually_exclusive_group(required=True)
+    group = parser.add_mutually_exclusive_group(required=False)
     group.add_argument("--ticker", help="Satu kode saham IDX, contoh: DMAS")
-    group.add_argument("--all",    action="store_true",
-                       help=f"Prediksi semua ticker di {WATCHLIST}")
+    group.add_argument("--all",    action="store_true", default=True,
+                       help=f"Prediksi semua ticker di {WATCHLIST} (default)")
     parser.add_argument("--lookback", type=int,   default=None,
                         help="Override lookback (hanya berlaku dengan --ticker)")
     parser.add_argument("--alpha",    type=float, default=None,
@@ -307,7 +310,13 @@ if __name__ == "__main__":
         if not args.ticker:
             parser.error("--backtest hanya bisa digunakan dengan --ticker")
         run_backtest(args.ticker, args.backtest, args.lookback, args.alpha)
-    elif args.all:
+    elif args.ticker:
+        r = predict_ticker(args.ticker, args.lookback, args.alpha)
+        if r:
+            print_detail(r)
+        else:
+            print(f"  Ticker '{args.ticker}' tidak ditemukan di database.")
+    else:
         tickers = load_watchlist()
         results = []
         for t in tickers:
@@ -324,9 +333,3 @@ if __name__ == "__main__":
                 for r in results:
                     print_detail(r)
             print_summary(results)
-    else:
-        r = predict_ticker(args.ticker, args.lookback, args.alpha)
-        if r:
-            print_detail(r)
-        else:
-            print(f"  Ticker '{args.ticker}' tidak ditemukan di database.")
