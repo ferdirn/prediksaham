@@ -1,0 +1,74 @@
+{
+  "DMAS": {
+    "lookback": 3,
+    "alpha": 100.0,
+    "cv_mae": 0.8394,
+    "cv_dir_acc": 37.09,
+    "data_rows": 1202,
+    "last_updated": "2026-06-06"
+  },
+  "BBCA": {
+    "lookback": 3,
+    "alpha": 100.0,
+    "cv_mae": 1.1309,
+    "cv_dir_acc": 48.94,
+    "data_rows": 1202,
+    "last_updated": "2026-06-06"
+  },
+  "ANTM": {
+    "lookback": 3,
+    "alpha": 100.0,
+    "cv_mae": 2.0188,
+    "cv_dir_acc": 41.01,
+    "data_rows": 1202,
+    "last_updated": "2026-06-06"
+  },
+  "CLEO": {
+    "lookback": 3,
+    "alpha": 100.0,
+    "cv_mae": 1.8055,
+    "cv_dir_acc": 42.61,
+    "data_rows": 1202,
+    "last_updated": "2026-06-06"
+  },
+  "MPMX": {
+    "lookback": 3,
+    "alpha": 100.0,
+    "cv_mae": 0.8389,
+    "cv_dir_acc": 34.27,
+    "data_rows": 1202,
+    "last_updated": "2026-06-06"
+  },
+  "SUNI": {
+    "lookback": 4,
+    "alpha": 100.0,
+    "cv_mae": 2.0401,
+    "cv_dir_acc": 38.05,
+    "data_rows": 806,
+    "last_updated": "2026-06-06"
+  },
+  "INET": {
+    "lookback": 3,
+    "alpha": 100.0,
+    "cv_mae": 3.9213,
+    "cv_dir_acc": 37.7,
+    "data_rows": 683,
+    "last_updated": "2026-06-06"
+  },
+  "WIFI": {
+    "lookback": 4,
+    "alpha": 100.0,
+    "cv_mae": 2.834,
+    "cv_dir_acc": 46.13,
+    "data_rows": 1202,
+    "last_updated": "2026-06-06"
+  },
+  "^JKSE": {
+    "lookback": 4,
+    "alpha": 100.0,
+    "cv_mae": 0.7218,
+    "cv_dir_acc": 52.46,
+    "data_rows": 1198,
+    "last_updated": "2026-06-06"
+  }
+}

@@ -1,0 +1,10 @@
+# BEI Watchlist — one ticker per line (bare IDX format, no .JK needed)
+^JKSE
+BBCA
+ANTM
+CLEO
+MPMX
+DMAS
+SUNI
+INET
+WIFI

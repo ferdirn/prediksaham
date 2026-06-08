@@ -1,0 +1,12 @@
+{
+  "env": {
+    "BEI_DB_PATH": "bei_stocks.db"
+  },
+  "permissions": {
+    "allow": [
+      "Bash(sqlite3 /Users/ferdirn/Documents/project/bei_trader_recommendation/bei_stocks.db ' *)",
+      "Bash(sqlite3 *)"
+    ]
+  },
+  "_comment": "Local overrides — do NOT commit this file. Add to .gitignore."
+}

@@ -1,0 +1,65 @@
+{
+  "ANTM": {
+    "lookback": 7,
+    "C": 0.01,
+    "cv_dir_acc": 51.8,
+    "data_rows": 1198,
+    "last_updated": "2026-06-06"
+  },
+  "BBCA": {
+    "lookback": 2,
+    "C": 0.01,
+    "cv_dir_acc": 56.07,
+    "data_rows": 1198,
+    "last_updated": "2026-06-06"
+  },
+  "CLEO": {
+    "lookback": 3,
+    "C": 0.01,
+    "cv_dir_acc": 53.25,
+    "data_rows": 1198,
+    "last_updated": "2026-06-06"
+  },
+  "DMAS": {
+    "lookback": 1,
+    "C": 0.01,
+    "cv_dir_acc": 57.89,
+    "data_rows": 1198,
+    "last_updated": "2026-06-06"
+  },
+  "INET": {
+    "lookback": 14,
+    "C": 0.1,
+    "cv_dir_acc": 52.94,
+    "data_rows": 655,
+    "last_updated": "2026-06-06"
+  },
+  "MPMX": {
+    "lookback": 2,
+    "C": 0.01,
+    "cv_dir_acc": 56.86,
+    "data_rows": 1124,
+    "last_updated": "2026-06-06"
+  },
+  "SUNI": {
+    "lookback": 7,
+    "C": 10.0,
+    "cv_dir_acc": 53.14,
+    "data_rows": 799,
+    "last_updated": "2026-06-06"
+  },
+  "WIFI": {
+    "lookback": 7,
+    "C": 0.1,
+    "cv_dir_acc": 54.39,
+    "data_rows": 1191,
+    "last_updated": "2026-06-06"
+  },
+  "^JKSE": {
+    "lookback": 14,
+    "C": 1.0,
+    "cv_dir_acc": 51.53,
+    "data_rows": 1196,
+    "last_updated": "2026-06-06"
+  }
+}

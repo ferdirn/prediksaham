@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+
+# Virtual environment
+.venv/
+venv/
+env/
+
+# Database (local artifact)
+bei_stocks.db
+
+# Temp files (atomic write)
+*.tmp
+
+# Log files
+*.log
+
+# macOS
+.DS_Store
+
+# IDE
+.idea/
+.vscode/

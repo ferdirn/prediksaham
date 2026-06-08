@@ -1,0 +1,53 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(source .venv/bin/activate && python bei_stock_downloader.py*)",
+      "Bash(source .venv/bin/activate && python -c*)",
+      "Bash(source .venv/bin/activate && python -m*)",
+      "Bash(sqlite3 bei_stocks.db*)",
+      "Bash(cat watchlist.txt)",
+      "Bash(wc -l watchlist.txt)",
+      "Bash(grep*watchlist.txt)",
+      "Bash(ls -la)",
+      "Bash(ls .venv/lib/python*/site-packages/)",
+      "Bash(pip show*)",
+      "Read(bei_stock_downloader.py)",
+      "Read(watchlist.txt)",
+      "Read(bei_stocks.db)",
+      "Read(.claude/**)"
+    ],
+    "deny": [
+      "Bash(rm bei_stocks.db)",
+      "Bash(drop table*)",
+      "Bash(DELETE FROM*)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if echo \"$CLAUDE_TOOL_INPUT\" | grep -q 'python '; then source .venv/bin/activate 2>/dev/null || true; fi"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo \"[$(date '+%Y-%m-%d %H:%M:%S')] File written: $CLAUDE_TOOL_OUTPUT\" >> .claude/activity.log 2>/dev/null || true"
+          }
+        ]
+      }
+    ]
+  },
+  "env": {
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "PYTHONUNBUFFERED": "1"
+  }
+}
