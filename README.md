@@ -28,7 +28,7 @@ Data is sourced from Yahoo Finance and stored in a local SQLite database.
 
 ```bash
 git clone <repo-url>
-cd bei_lstm_predictor
+cd prediksaham
 
 python -m venv .venv
 source .venv/bin/activate
@@ -49,6 +49,9 @@ source .venv/bin/activate
 ### 1. Download Data
 
 ```bash
+# Default: all watchlist tickers, last 5 years
+python bei_stock_downloader.py
+
 # Single ticker, last 30 days
 python bei_stock_downloader.py --ticker BBCA --days 30
 
@@ -139,7 +142,7 @@ pytest
 ## Project Structure
 
 ```
-bei_lstm_predictor/
+prediksaham/
 ├── bei_stock_downloader.py       # Download OHLCV → SQLite
 ├── stock_viewer.py               # View last N rows for a ticker
 ├── utils.py                      # Shared helpers (watchlist, config I/O)

@@ -163,7 +163,7 @@ def train_and_eval(df: pd.DataFrame, lookback: int) -> dict | None:
         verbose=0,
     )
 
-    pred_scaled = model.predict(X_test, verbose=0).flatten()
+    pred_scaled = model(X_test, training=False).numpy().flatten()
     actual      = inverse_close(scaler, y_test)
     predicted   = inverse_close(scaler, pred_scaled)
 
