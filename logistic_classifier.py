@@ -288,26 +288,42 @@ def print_summary(results: list[dict]) -> None:
         rows.append({
             "Ticker"    : r["ticker"],
             "Last Close": r["last_close"],
-            "Prediksi"  : "▲ NAIK" if r["pred_dir"] == 1 else "▼ TURUN",
+            "pred_dir"  : r["pred_dir"],
             "Prob Naik" : r["prob_up"] * 100,
             "Confidence": confidence * 100,
             "Lookback"  : r["lookback"],
         })
 
-    df = pd.DataFrame(rows).sort_values("Confidence", ascending=False)
+    df    = pd.DataFrame(rows).sort_values("Confidence", ascending=False)
+    naik  = df[df["pred_dir"] == 1]
+    turun = df[df["pred_dir"] == 0]
 
-    print(f"\n{'═'*65}")
+    header = f"  {'Ticker':<7} {'Last Close':>11} {'Prob Naik':>10} {'Confidence':>11} {'LB':>3}"
+    sep    = f"  {'─'*7} {'─'*11} {'─'*10} {'─'*11} {'─'*3}"
+
+    def print_rows(subset: pd.DataFrame) -> None:
+        for _, row in subset.iterrows():
+            print(f"  {row['Ticker']:<7} {row['Last Close']:>11,.0f} "
+                  f"{row['Prob Naik']:>9.1f}% {row['Confidence']:>10.1f}%  {int(row['Lookback']):>2}")
+
+    print(f"\n{'═'*55}")
     print(f"  PREDIKSI ARAH BESOK — {date.today()}  (Logistic Regression)")
-    print(f"{'═'*65}")
-    print(f"  {'Ticker':<7} {'Last Close':>11} {'Prediksi':>9} {'Prob Naik':>10} {'Confidence':>11} {'LB':>3}")
-    print(f"  {'─'*7} {'─'*11} {'─'*9} {'─'*10} {'─'*11} {'─'*3}")
-    for _, row in df.iterrows():
-        print(f"  {row['Ticker']:<7} {row['Last Close']:>11,.0f} {row['Prediksi']:>9} "
-              f"{row['Prob Naik']:>9.1f}% {row['Confidence']:>10.1f}%  {int(row['Lookback']):>2}")
-    print(f"{'═'*65}")
+    print(f"{'═'*55}")
+
+    print(f"\n  ▲ NAIK ({len(naik)} ticker)")
+    print(header)
+    print(sep)
+    print_rows(naik) if not naik.empty else print("  (tidak ada)")
+
+    print(f"\n  ▼ TURUN ({len(turun)} ticker)")
+    print(header)
+    print(sep)
+    print_rows(turun) if not turun.empty else print("  (tidak ada)")
+
+    print(f"\n{'═'*55}")
     print(f"  Confidence = seberapa yakin model terhadap prediksinya")
     print(f"  LB = lookback  |  Diurutkan: confidence tertinggi → terendah")
-    print(f"{'═'*65}\n")
+    print(f"{'═'*55}\n")
 
 
 if __name__ == "__main__":
@@ -333,15 +349,18 @@ if __name__ == "__main__":
             "  python logistic_classifier.py --ticker DMAS --backtest 30\n"
         ),
     )
-    group = parser.add_mutually_exclusive_group(required=True)
+    group = parser.add_mutually_exclusive_group(required=False)
     group.add_argument("--ticker", help="Satu kode saham IDX")
     group.add_argument("--all",    action="store_true",
-                       help="Prediksi semua ticker di watchlist.txt")
+                       help="Prediksi semua ticker di watchlist.txt (default)")
     parser.add_argument("--backtest", type=int, default=None, metavar="N",
                         help="Backtest N hari terakhir (berlaku untuk --ticker maupun --all)")
     parser.add_argument("--detail",   action="store_true",
                         help="Tampilkan baris per hari pada backtest --all, atau bobot pada prediksi --all")
     args = parser.parse_args()
+
+    if args.ticker is None:
+        args.all = True
 
     if args.all:
         tickers = load_watchlist()
