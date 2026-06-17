@@ -27,9 +27,9 @@ bei_stocks.db                  — SQLite database (local artifact, not committe
 
 — LSTM Prediction (prediksi harga)
 lstm_predictor.py              — Train LSTM, predict next-day Close price for one ticker
-lstm_lookback_search.py        — Lookback hyperparameter search (3–60) for one ticker
+lstm_config_search.py        — Lookback hyperparameter search (3–60) for one ticker
 lstm_batch_config_search.py    — Batch lookback search for multiple tickers
-lstm_batch_predict.py          — Predict next-day price for all configured tickers
+lstm_batch_predictor.py          — Predict next-day price for all configured tickers
 lstm_configs.json              — Saved optimal LSTM config per ticker
 ticker_configs_research/       — Lookback search outputs: CSV + PNG per ticker
 prediction_images/             — LSTM prediction plots: {TICKER}_lstm_prediction.png
@@ -44,6 +44,10 @@ ridge_configs.json             — Saved optimal Ridge config per ticker
 logistic_classifier.py         — Predict next-day direction (up/down) + confidence
 logistic_config_search.py      — Search optimal lookback + C per ticker
 logistic_configs.json          — Saved optimal Logistic config per ticker
+
+— Combined Predictor
+combined_predict.py            — Run all three models, display one consolidated table with consensus + recommendation
+utils.py                       — Shared helpers: load_watchlist(), save_configs(), load_configs()
 ```
 
 ## Data Downloader
@@ -72,6 +76,9 @@ python lstm_predictor.py --ticker BBCA --lookback 20 --epochs 150 --forecast 3
 
 # Save current run's config for this ticker
 python lstm_predictor.py --ticker TLKM --lookback 22 --save-config
+
+# Backtest: train on data before last N days, roll-predict each day
+python lstm_predictor.py --ticker BBCA --backtest 30
 ```
 
 Key CONFIG constants in `lstm_predictor.py` (overridden by `lstm_configs.json` if available):
@@ -92,8 +99,8 @@ Key CONFIG constants in `lstm_predictor.py` (overridden by `lstm_configs.json` i
 
 ```bash
 # Search optimal lookback for one ticker → saves to ticker_configs_research/
-python lstm_lookback_search.py --ticker BBCA
-python lstm_lookback_search.py --ticker BBCA --start 3 --end 60
+python lstm_config_search.py --ticker BBCA
+python lstm_config_search.py --ticker BBCA --start 3 --end 60
 
 # Batch search for multiple tickers
 python lstm_batch_config_search.py
@@ -111,7 +118,14 @@ Best config per ticker is auto-saved to `lstm_configs.json`.
 
 ```bash
 # Predict next-day price for all tickers with saved configs
-python lstm_batch_predict.py
+python lstm_batch_predictor.py
+
+# Single ticker
+python lstm_batch_predictor.py --ticker BBCA
+
+# Backtest all configured tickers (or single with --ticker)
+python lstm_batch_predictor.py --backtest 30
+python lstm_batch_predictor.py --ticker BBCA --backtest 30
 ```
 
 Output: ranked table + `predictions_YYYY-MM-DD.csv`.
@@ -123,20 +137,43 @@ Stores optimal LSTM hyperparameters per ticker. `lstm_predictor.py` reads this a
 ## Ridge Regression
 
 ```bash
-python ridge_config_search.py --ticker DMAS          # cari config optimal
-python ridge_predictor.py --ticker DMAS               # prediksi satu ticker
-python ridge_predictor.py --all                       # semua watchlist
+python ridge_config_search.py                        # riset semua ticker di watchlist.txt
+python ridge_config_search.py --ticker DMAS          # cari config optimal satu ticker
+python ridge_config_search.py --tickers DMAS BBCA    # beberapa ticker sekaligus
+python ridge_predictor.py --ticker DMAS              # prediksi satu ticker
+python ridge_predictor.py --all                      # semua watchlist
+python ridge_predictor.py --all --detail             # semua watchlist + bobot koefisien per ticker
 python ridge_predictor.py --ticker DMAS --backtest 30 # backtest
 ```
 
 ## Logistic Regression (Classifier)
 
 ```bash
-python logistic_config_search.py                         # riset semua ticker di DB
+python logistic_config_search.py                         # riset semua ticker di watchlist
+python logistic_classifier.py --ticker DMAS              # prediksi satu ticker
 python logistic_classifier.py --all                      # prediksi arah semua watchlist
 python logistic_classifier.py --all --backtest 30        # backtest semua watchlist
 python logistic_classifier.py --ticker DMAS --backtest 30
+python logistic_classifier.py --ticker DMAS --detail     # tampilkan koefisien model
 ```
+
+## Combined Predictor
+
+Jalankan ketiga model sekaligus untuk semua ticker di watchlist, tampilkan satu tabel ringkas dengan kolom konsensus dan rekomendasi.
+
+```bash
+python combined_predict.py                               # semua ticker di watchlist.txt
+python combined_predict.py --tickers BBCA ANTM DMAS      # ticker spesifik
+python combined_predict.py --no-lstm                     # skip model LSTM
+python combined_predict.py --no-ridge                    # skip model Ridge
+python combined_predict.py --no-logistic                 # skip model Logistic
+```
+
+Kolom output: `Ticker`, `Last Close`, `LSTM Forecast`, `LSTM Chg%`, `Ridge Ret%`, `Logistic`, `Conf`, `Sinyal`, `Rekomendasi`
+
+- **Sinyal** — konsensus antar model (misal `3/3` = semua sepakat)
+- **Rekomendasi** — `BELI KUAT` / `BELI` / `NETRAL` / `JUAL` / `JUAL KUAT` berdasarkan mayoritas sinyal
+- Tabel dibagi tiga seksi: **▼ JUAL** (atas) → **◆ NETRAL** → **▲ BELI** (bawah); dalam tiap seksi diurutkan sinyal terkuat dulu
 
 ## Database
 
@@ -161,7 +198,8 @@ Primary lookup: `WHERE Ticker = ? AND Date BETWEEN ? AND ?`
 │   ├── db-status.md           → /db-status
 │   ├── refresh.md             → /refresh [days]
 │   ├── analyze-ticker.md      → /analyze-ticker TICKER [days]
-│   └── screen.md              → /screen [preset]
+│   ├── screen.md              → /screen [preset]
+│   └── doc-update.md          → /doc-update [--claude|--readme|--check]
 └── rules/
     ├── python.md
     ├── database.md
@@ -177,6 +215,7 @@ Primary lookup: `WHERE Ticker = ? AND Date BETWEEN ? AND ?`
 | `/refresh [days]` | Quick update — last N days (default: 7) |
 | `/analyze-ticker TICKER [days]` | Full TA analysis for one ticker |
 | `/screen [preset]` | Screen tickers: `momentum`, `oversold`, `breakout`, `volatile` |
+| `/doc-update [--claude\|--readme\|--check]` | Sync documentation with code; `--check` to preview only |
 
 ### Sub-agents
 

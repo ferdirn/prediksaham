@@ -1,65 +1,177 @@
 {
   "ANTM": {
-    "lookback": 7,
+    "lookback": 14,
     "C": 0.01,
-    "cv_dir_acc": 51.8,
-    "data_rows": 1198,
-    "last_updated": "2026-06-06"
+    "cv_dir_acc": 52.46,
+    "data_rows": 1204,
+    "last_updated": "2026-06-17"
   },
   "BBCA": {
     "lookback": 2,
     "C": 0.01,
-    "cv_dir_acc": 56.07,
-    "data_rows": 1198,
-    "last_updated": "2026-06-06"
+    "cv_dir_acc": 56.09,
+    "data_rows": 1203,
+    "last_updated": "2026-06-13"
   },
   "CLEO": {
-    "lookback": 3,
-    "C": 0.01,
-    "cv_dir_acc": 53.25,
-    "data_rows": 1198,
-    "last_updated": "2026-06-06"
+    "lookback": 2,
+    "C": 1.0,
+    "cv_dir_acc": 52.82,
+    "data_rows": 1204,
+    "last_updated": "2026-06-17"
   },
   "DMAS": {
     "lookback": 1,
     "C": 0.01,
-    "cv_dir_acc": 57.89,
-    "data_rows": 1198,
-    "last_updated": "2026-06-06"
+    "cv_dir_acc": 57.48,
+    "data_rows": 1204,
+    "last_updated": "2026-06-17"
   },
   "INET": {
     "lookback": 14,
-    "C": 0.1,
-    "cv_dir_acc": 52.94,
-    "data_rows": 655,
-    "last_updated": "2026-06-06"
+    "C": 1.0,
+    "cv_dir_acc": 53.02,
+    "data_rows": 661,
+    "last_updated": "2026-06-17"
   },
   "MPMX": {
-    "lookback": 2,
-    "C": 0.01,
-    "cv_dir_acc": 56.86,
-    "data_rows": 1124,
-    "last_updated": "2026-06-06"
+    "lookback": 5,
+    "C": 0.1,
+    "cv_dir_acc": 54.61,
+    "data_rows": 1130,
+    "last_updated": "2026-06-17"
   },
   "SUNI": {
-    "lookback": 7,
-    "C": 10.0,
-    "cv_dir_acc": 53.14,
-    "data_rows": 799,
-    "last_updated": "2026-06-06"
+    "lookback": 10,
+    "C": 1.0,
+    "cv_dir_acc": 53.33,
+    "data_rows": 805,
+    "last_updated": "2026-06-17"
   },
   "WIFI": {
     "lookback": 7,
     "C": 0.1,
-    "cv_dir_acc": 54.39,
-    "data_rows": 1191,
-    "last_updated": "2026-06-06"
+    "cv_dir_acc": 53.84,
+    "data_rows": 1197,
+    "last_updated": "2026-06-17"
   },
   "^JKSE": {
     "lookback": 14,
     "C": 1.0,
-    "cv_dir_acc": 51.53,
+    "cv_dir_acc": 51.57,
+    "data_rows": 1202,
+    "last_updated": "2026-06-17"
+  },
+  "BIRD": {
+    "lookback": 5,
+    "C": 1.0,
+    "cv_dir_acc": 53.52,
+    "data_rows": 1199,
+    "last_updated": "2026-06-17"
+  },
+  "BSDE": {
+    "lookback": 3,
+    "C": 0.01,
+    "cv_dir_acc": 52.98,
+    "data_rows": 1199,
+    "last_updated": "2026-06-17"
+  },
+  "BTPS": {
+    "lookback": 3,
+    "C": 0.1,
+    "cv_dir_acc": 56.37,
+    "data_rows": 1199,
+    "last_updated": "2026-06-17"
+  },
+  "CSRA": {
+    "lookback": 1,
+    "C": 0.1,
+    "cv_dir_acc": 54.34,
+    "data_rows": 1199,
+    "last_updated": "2026-06-17"
+  },
+  "IPCC": {
+    "lookback": 7,
+    "C": 0.01,
+    "cv_dir_acc": 55.61,
+    "data_rows": 1199,
+    "last_updated": "2026-06-17"
+  },
+  "NCKL": {
+    "lookback": 2,
+    "C": 10.0,
+    "cv_dir_acc": 54.07,
+    "data_rows": 742,
+    "last_updated": "2026-06-17"
+  },
+  "TAPG": {
+    "lookback": 1,
+    "C": 0.1,
+    "cv_dir_acc": 54.55,
+    "data_rows": 1195,
+    "last_updated": "2026-06-17"
+  },
+  "TBLA": {
+    "lookback": 2,
+    "C": 0.01,
+    "cv_dir_acc": 55.75,
+    "data_rows": 1199,
+    "last_updated": "2026-06-17"
+  },
+  "TPMA": {
+    "lookback": 10,
+    "C": 0.01,
+    "cv_dir_acc": 50.62,
+    "data_rows": 1192,
+    "last_updated": "2026-06-17"
+  },
+  "ADES": {
+    "lookback": 14,
+    "C": 0.1,
+    "cv_dir_acc": 52.64,
+    "data_rows": 1197,
+    "last_updated": "2026-06-17"
+  },
+  "PGEO": {
+    "lookback": 2,
+    "C": 0.1,
+    "cv_dir_acc": 51.4,
+    "data_rows": 772,
+    "last_updated": "2026-06-17"
+  },
+  "TOBA": {
+    "lookback": 7,
+    "C": 1.0,
+    "cv_dir_acc": 54.72,
     "data_rows": 1196,
-    "last_updated": "2026-06-06"
+    "last_updated": "2026-06-17"
+  },
+  "AMMN": {
+    "lookback": 1,
+    "C": 10.0,
+    "cv_dir_acc": 53.02,
+    "data_rows": 692,
+    "last_updated": "2026-06-17"
+  },
+  "DKFT": {
+    "lookback": 1,
+    "C": 0.1,
+    "cv_dir_acc": 53.86,
+    "data_rows": 1195,
+    "last_updated": "2026-06-17"
+  },
+  "PSAB": {
+    "lookback": 2,
+    "C": 0.01,
+    "cv_dir_acc": 55.88,
+    "data_rows": 1194,
+    "last_updated": "2026-06-17"
+  },
+  "TINS": {
+    "lookback": 2,
+    "C": 0.1,
+    "cv_dir_acc": 51.44,
+    "data_rows": 1186,
+    "last_updated": "2026-06-17"
   }
 }

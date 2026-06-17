@@ -1,191 +1,94 @@
 ---
-description: Generate and maintain comprehensive documentaiton from code
-argument-hint: [--api or --readme]
+description: Generate and maintain comprehensive documentation from code
+argument-hint: [--readme | --claude | --check]
 allowed-tools: Bash(ls:*), Bash(cat:*), Bash(test:*), Bash(grep:*), Bash(find:*)
 
 ---
 
-Generate and maintain documentation from code, keeping it in sync with implementation.
+Perbarui dokumentasi project agar tetap sinkron dengan implementasi kode terbaru.
 
-## Usage Examples
-
-**Basic documentation generation:**
-```
-/expense-report-docs
-```
-
-**Generate API documentation:**
-```
-/expense-report-docs --api
-```
-
-**Check documentation coverage:**
-```
-/expense-report-docs --check
-```
-
-**Generate README:**
-```
-/expense-report-docs --readme
-```
-
-**Help and options:**
-```
-/expense-report-docs --help
-
-## Implementation
-
-If $ARGUMENTS contains "help" or "--help":
-Display this usage information and exit.
-
-Parse documentation options from $ARGUMENTS (--generate, --api, --readme, --check, or specific module/file).
-
-
-## 1. Analyze Current Documentation
-
-Check existing documentation:
-!find . -name "*.md" | grep -v node_modules | head -20
-!test -f README.md && echo "README exists" || echo "No README.md found"
-!find . -name "*.py" -exec grep -l '"""' {} \; | wc -l
-
-## 2. Generate Documentation
-
-Based on the arguments and project type, generate appropriate documentation.
-
-For Python projects, extract docstrings:
-!python -c "import ast; import os; [print(f'{f}: {len([n for n in ast.walk(ast.parse(open(f).read())) if isinstance(n, ast.FunctionDef) and ast.get_docstring(n)])} documented functions') for f in os.listdir('.') if f.endswith('.py')]" 2>/dev/null
-
-
-## 3. API Documentation
-
-If --api flag is present, analyze API endpoints:
-!grep -r -E "@(app|router)\.(get|post|put|delete|patch)" . --include="*.py" 2>/dev/null | head -20
-
-
-## 4. Check Documentation Coverage
-
-Count undocumented functions:
-!find . -name "*.py" -exec grep -E "^def |^class " {} \; | wc -l
-!find . -name "*.py" -exec grep -A1 -E "^def |^class " {} \; | grep '"""' | wc -l
-
-
-Think step by step about documentation needs and:
-
-1. Identify what documentation is missing
-2. Generate appropriate documentation based on code analysis
-3. Create templates for missing documentation
-4. Ensure examples are included where helpful
-
-
-Generate documentation in this format:
-
-For README.md:
-```markdown
-# Project Name
-
-Brief description of what this project does.
-
-## Features
-
-Add all app features
-
-## Installation
-
-Add Prerequisites, Setup project guide, how to run app, how to run a test
-
-```bash
-# Installation commands based on package.json or requirements.txt
-```
+Dokumentasi utama project ini:
+- `CLAUDE.md` — referensi lengkap untuk Claude Code: daftar file, usage CLI, konfigurasi
+- `README.md` — dokumentasi publik: overview, instalasi, contoh penggunaan
 
 ## Usage
 
-```python
-# Example usage based on main entry points
+```
+/doc-update              # periksa dan perbarui CLAUDE.md + README.md
+/doc-update --claude     # fokus ke CLAUDE.md saja
+/doc-update --readme     # fokus ke README.md saja
+/doc-update --check      # hanya periksa, jangan tulis — tampilkan apa yang perlu diperbarui
 ```
 
-## API Reference
+## Alur kerja yang disarankan
 
-### [Function/Class Name]
-[Description from docstring or inferred from code]
+Jalankan `/doc-update` setelah:
+1. Menambahkan script Python baru ke project
+2. Mengubah argumen CLI (`argparse`) di script yang sudah ada
+3. Mengubah perilaku default sebuah command
+4. Menambahkan atau mengubah slash command di `.claude/commands/`
 
-**Parameters:**
-- `param_name` (type): Description
+Urutan kerja:
+1. Tulis atau ubah kode terlebih dahulu
+2. Jalankan `/doc-update` — Claude akan scan perubahan
+3. Claude membandingkan kode aktual vs isi `CLAUDE.md` dan `README.md`
+4. Claude mengusulkan atau langsung menulis pembaruan dokumentasi
 
-**Returns:**
-- type: Description
+## Implementation
 
-**Example:**
-```python
-# Example usage
+Parse $ARGUMENTS untuk menentukan target (`--claude`, `--readme`, `--check`). Tanpa flag, proses keduanya.
+
+Jika $ARGUMENTS mengandung "help" atau "--help", tampilkan usage di atas dan berhenti.
+
+### 1. Scan file Python di root project
+
+```
+find . -maxdepth 1 -name "*.py" | sort
 ```
 
-## Contributing
+Untuk setiap file `.py`, ekstrak:
+- Argumen CLI (`argparse`) — nama flag, default, help text
+- Fungsi entry point utama (`if __name__ == "__main__"`)
+- Docstring di bagian atas file (Usage block)
+- Jika file adalah sebuah executable script CLI, maka tambahkan informasi "Alur kerja yang disarankan:"
 
-See CONTRIBUTING.md for details.
+### 2. Bandingkan dengan CLAUDE.md
 
-## License
+Baca `CLAUDE.md` dan periksa:
+- Apakah semua script `.py` di root sudah tercantum di section **Project Files**?
+- Apakah contoh command di tiap section masih akurat (flag, default value)?
+- Apakah ada script baru yang belum didokumentasikan?
+- Apakah ada flag yang berubah atau ditambahkan?
 
-[License information]
+### 3. Bandingkan dengan README.md
+
+Baca `README.md` dan periksa:
+- Apakah overview project masih akurat?
+- Apakah contoh penggunaan di README masih sesuai dengan kode?
+- Apakah ada fitur baru yang perlu ditambahkan ke bagian Features?
+
+### 4. Hasilkan laporan atau tulis pembaruan
+
+Jika `--check`:
+Tampilkan laporan dalam format ini:
+
 ```
-
-For API documentation:
-```markdown
-# API Documentation
-
-## Endpoints
-
-### GET /endpoint
-Description of what this endpoint does.
-
-**Parameters:**
-- `param` (query/path/body): Description
-
-**Response:**
-```json
-{
-  "field": "example"
-}
-```
-
-**Example:**
-```bash
-curl -X GET http://localhost:8000/endpoint
-```
-```
-
-If --check flag is present, generate a documentation coverage report:
-```
-DOCUMENTATION COVERAGE REPORT
+DOKUMENTASI COVERAGE REPORT
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Overall Coverage: X%
+Script yang terdokumentasi di CLAUDE.md : X / Y
+Script yang terdokumentasi di README.md : X / Y
 
-DOCUMENTED (X/Y)
+PERLU DIPERBARUI
 ─────────────────
-✓ module.py: X/Y functions
-✓ api.py: X/Y endpoints
+✗ CLAUDE.md — script_baru.py belum tercantum di Project Files
+✗ CLAUDE.md — flag --tickers di ridge_config_search.py belum didokumentasikan
+✗ README.md — contoh penggunaan logistic_classifier.py sudah tidak akurat
 
-MISSING DOCUMENTATION (X/Y)
-─────────────────────────────
-✗ utils.py: functionName (line X)
-✗ models.py: ClassName (line X)
-
-QUICK FIXES
-────────────
-1. Add docstring to functionName in utils.py
-2. Document ClassName in models.py
-3. Create API documentation for /endpoint
-
-📝 TEMPLATES TO ADD
-────────────────
-- README.md sections: Usage, Examples
-- API.md: Missing endpoint documentation
-- CONTRIBUTING.md: Development setup
+SUDAH SINKRON
+──────────────
+✓ CLAUDE.md — lstm_predictor.py
+✓ CLAUDE.md — ridge_predictor.py
+✓ README.md — overview project
 ```
 
-If --generate flag with specific file, create documentation for that file.
-If --update flag, update existing documentation to match code changes.
-
-
-
-
-
+Jika tidak ada flag `--check`, tulis langsung pembaruan ke file dokumentasi yang relevan.

@@ -9,8 +9,8 @@ Output:
     ticker_configs_research/{TICKER}_lookback_search.png  — plot kurva MAPE/MAE/RMSE
 
 Usage:
-    python lstm_lookback_search.py --ticker BBCA
-    python lstm_lookback_search.py --ticker BBCA --start 3 --end 60
+    python lstm_config_search.py --ticker BBCA
+    python lstm_config_search.py --ticker BBCA --start 3 --end 60
 """
 
 import argparse
@@ -59,7 +59,7 @@ SEED         = 42       # fixed seed → reproducible results across runs
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 
-def set_seed(seed: int):
+def set_seed(seed: int) -> None:
     np.random.seed(seed)
     tf.random.set_seed(seed)
 
@@ -78,7 +78,7 @@ def load_data(ticker: str) -> pd.DataFrame:
     return df
 
 
-def make_sequences(data: np.ndarray, lookback: int):
+def make_sequences(data: np.ndarray, lookback: int) -> tuple[np.ndarray, np.ndarray]:
     X, y = [], []
     for i in range(len(data) - lookback):
         X.append(data[i : i + lookback])
@@ -86,7 +86,7 @@ def make_sequences(data: np.ndarray, lookback: int):
     return np.array(X, dtype=np.float32), np.array(y, dtype=np.float32)
 
 
-def preprocess(df: pd.DataFrame, lookback: int):
+def preprocess(df: pd.DataFrame, lookback: int) -> tuple:
     raw      = df[FEATURES].values.astype(np.float32)
     split    = int(len(raw) * TRAIN_SPLIT)
 
@@ -99,7 +99,7 @@ def preprocess(df: pd.DataFrame, lookback: int):
     return X_train, y_train, X_test, y_test, scaler
 
 
-def inverse_close(scaler, vals):
+def inverse_close(scaler, vals) -> np.ndarray:
     n = scaler.scale_.shape[0]
     dummy = np.zeros((len(vals), n), dtype=np.float32)
     dummy[:, 0] = vals
@@ -169,13 +169,12 @@ def train_and_eval(df: pd.DataFrame, lookback: int) -> dict:
 
 # ── plot ──────────────────────────────────────────────────────────────────────
 
-def save_plot(ticker: str, results_df: pd.DataFrame):
+def save_plot(ticker: str, results_df: pd.DataFrame) -> None:
     fig, axes = plt.subplots(3, 1, figsize=(14, 11), sharex=True)
     fig.suptitle(f"{ticker} — Lookback Hyperparameter Search  (LSTM, seed={SEED})",
                  fontsize=13)
 
     best_mape = results_df.loc[results_df["mape_pct"].idxmin()]
-    best_mae  = results_df.loc[results_df["mae_idr"].idxmin()]
 
     for ax, col, label, color in [
         (axes[0], "mape_pct", "MAPE (%)",       "royalblue"),
@@ -206,7 +205,7 @@ def save_plot(ticker: str, results_df: pd.DataFrame):
 
 # ── main ──────────────────────────────────────────────────────────────────────
 
-def run(ticker: str, start: int, end: int):
+def run(ticker: str, start: int, end: int) -> pd.DataFrame | None:
     print(f"\n{'═'*60}")
     print(f"  Lookback Search: {ticker}  |  range {start}–{end}  |  {end-start+1} models")
     print(f"  Fixed seed={SEED}  epochs≤{EPOCHS}  patience={PATIENCE}")
@@ -278,8 +277,28 @@ def run(ticker: str, start: int, end: int):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="LSTM lookback hyperparameter search for BEI stocks")
-    parser.add_argument("--ticker", type=str, required=True)
+    parser = argparse.ArgumentParser(
+        prog="lstm_config_search.py",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=(
+            "Lookback Hyperparameter Search — LSTM\n"
+            "=======================================\n"
+            "Melatih LSTM untuk setiap nilai lookback dalam rentang [start..end]\n"
+            "dan mencatat Test MAE, RMSE, MAPE. Best config disimpan otomatis\n"
+            "ke lstm_configs.json. Output CSV + PNG disimpan ke ticker_configs_research/."
+        ),
+        epilog=(
+            "Alur kerja yang disarankan:\n"
+            "  1. Download data       : python bei_stock_downloader.py --ticker BBCA --years 5\n"
+            "  2. Cari lookback optimal: python lstm_config_search.py --ticker BBCA\n"
+            "  3. Jalankan prediksi   : python lstm_predictor.py --ticker BBCA\n"
+            "\n"
+            "Contoh:\n"
+            "  python lstm_config_search.py --ticker BBCA\n"
+            "  python lstm_config_search.py --ticker BBCA --start 3 --end 60\n"
+        ),
+    )
+    parser.add_argument("--ticker", type=str, required=True, help="Kode saham IDX, contoh: BBCA")
     parser.add_argument("--start",  type=int, default=3,  help="Lookback start (default: 3)")
     parser.add_argument("--end",    type=int, default=60, help="Lookback end   (default: 60)")
     args = parser.parse_args()

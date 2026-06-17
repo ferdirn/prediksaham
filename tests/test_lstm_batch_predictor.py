@@ -1,5 +1,5 @@
 """
-Unit tests untuk lstm_batch_predict.py — fungsi pure (make_sequences, inverse_close).
+Unit tests untuk lstm_batch_predictor.py — fungsi pure (make_sequences, inverse_close).
 Training model tidak di-test karena terlalu lambat untuk unit test.
 """
 from pathlib import Path
@@ -11,7 +11,7 @@ import sys, os
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from lstm_batch_predict import make_sequences, inverse_close
+from lstm_batch_predictor import make_sequences, inverse_close
 from sklearn.preprocessing import MinMaxScaler
 
 

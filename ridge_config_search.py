@@ -11,6 +11,7 @@ Metrik evaluasi:
 Hasil terbaik disimpan ke ridge_configs.json.
 
 Usage:
+    python ridge_config_search.py                            # semua ticker di watchlist.txt
     python ridge_config_search.py --ticker DMAS
     python ridge_config_search.py --tickers DMAS BBCA ANTM
     python ridge_config_search.py --ticker DMAS --lookbacks 1 3 5 7 10 14 20
@@ -19,7 +20,6 @@ Usage:
 import argparse
 import sqlite3
 from datetime import date
-from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -28,7 +28,7 @@ from sklearn.metrics import mean_absolute_error
 from sklearn.model_selection import TimeSeriesSplit
 from sklearn.preprocessing import StandardScaler
 
-from utils import save_configs as _save_configs
+from utils import load_watchlist, save_configs as _save_configs
 
 SQLITE_PATH = "bei_stocks.db"
 LR_CONFIGS  = "ridge_configs.json"
@@ -145,7 +145,13 @@ if __name__ == "__main__":
             "Hasil disimpan ke ridge_configs.json dan langsung dipakai oleh ridge_predictor.py."
         ),
         epilog=(
+            "Alur kerja yang disarankan:\n"
+            "  1. Riset config semua watchlist : python ridge_config_search.py\n"
+            "  2. Prediksi return              : python ridge_predictor.py --all\n"
+            "  3. Backtest                     : python ridge_predictor.py --ticker DMAS --backtest 30\n"
+            "\n"
             "Contoh:\n"
+            "  python ridge_config_search.py                                    # semua ticker di watchlist.txt\n"
             "  python ridge_config_search.py --ticker DMAS\n"
             "  python ridge_config_search.py --tickers DMAS BBCA ANTM\n"
             "  python ridge_config_search.py --ticker DMAS --lookbacks 3 5 7 10 --alphas 0.1 1 10\n"
@@ -159,9 +165,9 @@ if __name__ == "__main__":
                         metavar="A", help=f"Nilai alpha Ridge yang dicoba (default: {DEFAULT_ALPHAS})")
     args = parser.parse_args()
 
-    tickers = args.tickers or ([args.ticker] if args.ticker else [])
+    tickers = args.tickers or ([args.ticker] if args.ticker else load_watchlist())
     if not tickers:
-        parser.error("Tentukan --ticker atau --tickers")
+        parser.error("Tentukan --ticker atau --tickers, atau tambahkan ticker ke watchlist.txt")
 
     print(f"\n{'═'*55}")
     print(f"  LR Config Search")

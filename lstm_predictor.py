@@ -19,7 +19,7 @@ CLI Parameters:
     --lookback    Jumlah hari ke belakang yang dilihat model per sequence.
                   Makin panjang = model menangkap tren lebih jauh, tapi butuh
                   lebih banyak data dan lebih lambat. Optimal per ticker berbeda,
-                  cari dengan lstm_lookback_search.py. (default: 48)
+                  cari dengan lstm_config_search.py. (default: 48)
 
     --forecast    Jumlah hari ke depan yang diprediksi. forecast=1 = besok saja,
                   forecast=5 = 5 hari ke depan sekaligus. (default: 1)
@@ -512,6 +512,118 @@ def run(ticker: str, lookback: int, forecast: int, epochs: int, db_path: str,
 
 
 # ──────────────────────────────────────────────
+# BACKTEST
+# ──────────────────────────────────────────────
+
+def run_backtest(ticker: str, n_days: int,
+                 lookback_override: int | None = None,
+                 db_path: str = SQLITE_PATH,
+                 verbose: bool = False) -> dict | None:
+    ticker = ticker.strip().upper()
+    c = _resolve_config(ticker,
+                        lookback_override if lookback_override else LOOKBACK,
+                        FORECAST, EPOCHS, None)
+
+    df = load_data(ticker, db_path, features=c["features"])
+    min_rows = c["lookback"] + n_days + 30
+    if len(df) < min_rows:
+        print(f"  [{ticker}] Data tidak cukup untuk backtest {n_days} hari "
+              f"(ada {len(df)}, butuh minimal {min_rows}).")
+        return None
+
+    raw_all   = df[c["features"]].values.astype(np.float32)
+    raw_train = raw_all[:-n_days]
+    split_idx = int(len(raw_train) * c["train_split"])
+
+    scaler       = MinMaxScaler()
+    train_scaled = scaler.fit_transform(raw_train[:split_idx])
+
+    X_train, y_train = make_sequences(train_scaled, c["lookback"], 1)
+    if len(X_train) < 30:
+        print(f"  [{ticker}] Sequence training tidak cukup.")
+        return None
+
+    model = build_model(
+        c["lookback"], len(c["features"]), 1,
+        lstm_units=c["lstm_units"], num_layers=c["num_layers"],
+        dropout=c["dropout"], dense_units=c["dense_units"],
+        learning_rate=c["learning_rate"],
+    )
+
+    spinner = Spinner(f"  Training {ticker} (backtest)") if not verbose else None
+    if spinner:
+        spinner.start()
+
+    model.fit(
+        X_train, y_train,
+        epochs=c["epochs"],
+        batch_size=c["batch_size"],
+        validation_split=0.1,
+        callbacks=[
+            EarlyStopping(monitor="val_loss", patience=c["patience"],
+                          restore_best_weights=True, verbose=int(verbose)),
+            ReduceLROnPlateau(monitor="val_loss", factor=0.5, patience=7,
+                              min_lr=1e-6, verbose=int(verbose)),
+        ],
+        verbose=int(verbose),
+    )
+
+    if spinner:
+        spinner.stop()
+
+    rows = []
+    for i in range(n_days, 0, -1):
+        window = raw_all[-(i + c["lookback"]):-i]
+        if len(window) < c["lookback"]:
+            continue
+        window_scaled = scaler.transform(window).reshape(1, c["lookback"], len(c["features"]))
+        pred_scaled   = model(tf.constant(window_scaled.astype(np.float32)),
+                              training=False).numpy()[0][0]
+        pred_close   = inverse_close(scaler, [pred_scaled])[0]
+        actual_close = df["Close"].iloc[-i]
+        last_close   = df["Close"].iloc[-(i + 1)]
+        pred_date    = df.index[-i].date()
+        error_pct    = (pred_close - actual_close) / actual_close * 100
+        correct_dir  = (pred_close >= last_close) == (actual_close >= last_close)
+        rows.append({
+            "Tanggal"   : pred_date,
+            "Last Close": last_close,
+            "Pred Close": pred_close,
+            "Act Close" : actual_close,
+            "Error%"    : error_pct,
+            "Arah"      : "✓" if correct_dir else "✗",
+        })
+
+    if not rows:
+        return None
+
+    result_df = pd.DataFrame(rows)
+    mape      = result_df["Error%"].abs().mean()
+    dir_acc   = (result_df["Arah"] == "✓").mean() * 100
+    n_benar   = int((result_df["Arah"] == "✓").sum())
+    n         = len(rows)
+
+    print(f"\n{'═'*82}")
+    print(f"  Backtest LSTM — {ticker} — {n} hari terakhir  (lookback={c['lookback']})")
+    print(f"  Catatan: model dilatih sekali pada data sebelum periode backtest")
+    print(f"{'═'*82}")
+    print(f"  {'Tanggal':<12} {'Last Close':>11} {'Pred Close':>11} "
+          f"{'Act Close':>10} {'Error%':>7} {'Dir':>4}")
+    print(f"  {'─'*12} {'─'*11} {'─'*11} {'─'*10} {'─'*7} {'─'*4}")
+    for _, r in result_df.iterrows():
+        print(f"  {str(r['Tanggal']):<12} {r['Last Close']:>11,.0f} "
+              f"{r['Pred Close']:>11,.0f} {r['Act Close']:>10,.0f} "
+              f"{r['Error%']:>+6.2f}% {r['Arah']:>4}")
+    print(f"  {'─'*82}")
+    print(f"  MAPE: {mape:.2f}%   |   Akurasi arah: {dir_acc:.1f}%   |   "
+          f"Benar: {n_benar}/{n} hari")
+    print(f"{'═'*82}\n")
+
+    return {"ticker": ticker, "mape": round(mape, 2), "dir_acc": round(dir_acc, 1),
+            "n_benar": n_benar, "n_total": n, "lookback": c["lookback"]}
+
+
+# ──────────────────────────────────────────────
 # CLI
 # ──────────────────────────────────────────────
 
@@ -525,14 +637,14 @@ if __name__ == "__main__":
             "(diisi oleh bei_stock_downloader.py).\n\n"
             "Konfigurasi optimal per ticker dimuat otomatis dari lstm_configs.json\n"
             "jika tersedia — tidak perlu set --lookback atau parameter lain secara manual.\n"
-            "Untuk mencari konfigurasi optimal, gunakan lstm_lookback_search.py."
+            "Untuk mencari konfigurasi optimal, gunakan lstm_config_search.py."
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Parameter:
   --ticker      IDX ticker code (wajib). Contoh: BBCA, TLKM, ANTM.
   --lookback    Jumlah hari ke belakang per sequence. Nilai optimal berbeda per ticker —
-                gunakan lstm_lookback_search.py untuk menemukannya. (default: 48)
+                gunakan lstm_config_search.py untuk menemukannya. (default: 48)
   --forecast    Jumlah hari ke depan yang diprediksi sekaligus. (default: 1)
   --epochs      Batas maksimum epoch. Early stopping biasanya berhenti lebih awal. (default: 300)
   --db          Path ke SQLite DB. (default: bei_stocks.db)
@@ -550,7 +662,7 @@ Output:
 
 Alur kerja yang disarankan:
   1. Download data       : python bei_stock_downloader.py --ticker BBCA --years 5
-  2. Cari lookback optimal: python lstm_lookback_search.py --ticker BBCA
+  2. Cari lookback optimal: python lstm_config_search.py --ticker BBCA
   3. Prediksi             : python lstm_predictor.py --ticker BBCA
      (config optimal dimuat otomatis dari lstm_configs.json)
 
@@ -560,6 +672,7 @@ Contoh:
   python lstm_predictor.py --ticker BBRI --forecast 3
   python lstm_predictor.py --ticker BBCA --train-all --save-config
   python lstm_predictor.py --ticker ANTM --lookback 28 --train-split 0.9 --verbose
+  python lstm_predictor.py --ticker BBCA --backtest 30
         """
     )
     parser.add_argument("--ticker",      type=str, required=True,
@@ -586,11 +699,20 @@ Contoh:
     parser.add_argument("--verbose",     action="store_true",
                         help="Tampilkan model summary, progress per epoch, dan pesan callback. "
                              "Default: hanya hasil akhir yang ditampilkan.")
+    parser.add_argument("--backtest",    type=int, default=None, metavar="N",
+                        help="Uji mundur N hari terakhir: bandingkan prediksi LSTM vs harga aktual. "
+                             "Model dilatih sekali pada data sebelum periode backtest.")
 
     args = parser.parse_args()
-    run(args.ticker, args.lookback, args.forecast, args.epochs, args.db,
-        verbose=args.verbose, train_all=args.train_all,
-        train_split_override=args.train_split)
+
+    if args.backtest is not None:
+        run_backtest(args.ticker, args.backtest,
+                     lookback_override=args.lookback if args.lookback != LOOKBACK else None,
+                     db_path=args.db, verbose=args.verbose)
+    else:
+        run(args.ticker, args.lookback, args.forecast, args.epochs, args.db,
+            verbose=args.verbose, train_all=args.train_all,
+            train_split_override=args.train_split)
 
     if args.save_config:
         from datetime import date

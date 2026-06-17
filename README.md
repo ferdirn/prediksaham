@@ -14,8 +14,9 @@ Data is sourced from Yahoo Finance and stored in a local SQLite database.
 
 - Download daily OHLCV data for any BEI/IDX ticker via Yahoo Finance
 - Three independent prediction models that complement each other
+- Combined predictor — one table with consensus signal from all three models
 - Per-ticker hyperparameter search and saved optimal configs
-- Batch prediction across all watchlist tickers
+- Batch prediction across all watchlist tickers (sorted by MAPE/MAE)
 - Backtest mode for all predictors
 - SQLite storage with idempotent upserts
 
@@ -79,8 +80,14 @@ python lstm_predictor.py --ticker BBCA --lookback 20 --epochs 150 --forecast 3
 # Save this run's config
 python lstm_predictor.py --ticker TLKM --lookback 22 --save-config
 
+# Backtest: train once, roll-predict last N days
+python lstm_predictor.py --ticker BBCA --backtest 30
+
 # Batch predict all configured tickers
-python lstm_batch_predict.py
+python lstm_batch_predictor.py
+python lstm_batch_predictor.py --ticker BBCA          # single ticker
+python lstm_batch_predictor.py --backtest 30          # backtest all
+python lstm_batch_predictor.py --ticker BBCA --backtest 30
 ```
 
 Output: ranked table printed to terminal + `predictions_YYYY-MM-DD.csv` + prediction plot saved to `prediction_images/`.
@@ -89,8 +96,8 @@ Output: ranked table printed to terminal + `predictions_YYYY-MM-DD.csv` + predic
 
 ```bash
 # Search optimal lookback for one ticker
-python lstm_lookback_search.py --ticker BBCA
-python lstm_lookback_search.py --ticker BBCA --start 3 --end 60
+python lstm_config_search.py --ticker BBCA
+python lstm_config_search.py --ticker BBCA --start 3 --end 60
 
 # Batch search across multiple tickers
 python lstm_batch_config_search.py
@@ -103,12 +110,14 @@ Results saved to `ticker_configs_research/{TICKER}_lookback_search.csv` and `.pn
 ### 3. Ridge Regression — Return Magnitude
 
 ```bash
-# Find optimal config
+# Find optimal config (all watchlist, or specific ticker)
+python ridge_config_search.py
 python ridge_config_search.py --ticker DMAS
 
 # Predict next-day return %
 python ridge_predictor.py --ticker DMAS
 python ridge_predictor.py --all               # all watchlist tickers
+python ridge_predictor.py --all --detail      # show model coefficients per ticker
 
 # Backtest (last 30 trading days)
 python ridge_predictor.py --ticker DMAS --backtest 30
@@ -117,19 +126,39 @@ python ridge_predictor.py --ticker DMAS --backtest 30
 ### 4. Logistic Regression — Direction Classifier
 
 ```bash
-# Find optimal config for all tickers in DB
+# Find optimal config for all tickers in watchlist
 python logistic_config_search.py
 
 # Predict next-day direction (up/down + confidence)
 python logistic_classifier.py --ticker DMAS
-python logistic_classifier.py --all                  # all watchlist
-python logistic_classifier.py --all --backtest 30    # backtest
+python logistic_classifier.py --ticker DMAS --detail  # show model coefficients
+python logistic_classifier.py --all                   # all watchlist
+python logistic_classifier.py --all --backtest 30     # backtest
 ```
 
-### 5. View Raw Data
+### 5. Combined Prediction (All Models)
+
+Run all three models for every ticker in the watchlist and display results in one consolidated table, ranked by consensus signal strength and confidence:
 
 ```bash
-python stock_viewer.py --ticker BBCA --rows 20
+python combined_predict.py                          # all watchlist tickers
+python combined_predict.py --tickers BBCA ANTM DMAS # specific tickers
+python combined_predict.py --no-lstm                # skip LSTM model
+python combined_predict.py --no-ridge               # skip Ridge model
+python combined_predict.py --no-logistic            # skip Logistic model
+```
+
+Output columns: `Ticker`, `Last Close`, `LSTM Forecast`, `LSTM Chg%`, `Ridge Ret%`, `Logistic`, `Conf`, `Sinyal`, `Rekomendasi`
+
+- **Sinyal** — how many models agree (e.g. `3/3` = all three bullish/bearish)
+- **Rekomendasi** — consensus label: `BELI KUAT` / `BELI` / `NETRAL` / `JUAL` / `JUAL KUAT`
+- Table is split into three sections: **▼ JUAL** (top) → **◆ NETRAL** → **▲ BELI** (bottom); within each section sorted by signal strength then confidence
+
+### 6. View Raw Data
+
+```bash
+python stock_viewer.py BBCA
+python stock_viewer.py BBCA --data 20
 ```
 
 ## Running Tests
@@ -150,9 +179,9 @@ prediksaham/
 ├── bei_stocks.db                 # SQLite database (local, not committed)
 │
 ├── lstm_predictor.py             # LSTM: train + predict next-day price
-├── lstm_lookback_search.py       # LSTM: lookback hyperparameter search
+├── lstm_config_search.py       # LSTM: lookback hyperparameter search
 ├── lstm_batch_config_search.py   # LSTM: batch hyperparameter search
-├── lstm_batch_predict.py         # LSTM: batch prediction for all tickers
+├── lstm_batch_predictor.py         # LSTM: batch prediction for all tickers
 ├── lstm_configs.json             # Saved optimal LSTM configs per ticker
 │
 ├── ridge_predictor.py            # Ridge: predict next-day return %
@@ -162,6 +191,8 @@ prediksaham/
 ├── logistic_classifier.py        # Logistic: predict next-day direction
 ├── logistic_config_search.py     # Logistic: hyperparameter search
 ├── logistic_configs.json         # Saved optimal Logistic configs
+│
+├── combined_predict.py           # Run all three models, one combined table
 │
 ├── ticker_configs_research/      # Lookback search outputs (CSV + PNG)
 ├── prediction_images/            # LSTM prediction plots

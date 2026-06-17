@@ -17,7 +17,6 @@ Usage:
 import argparse
 import sqlite3
 from datetime import date
-from pathlib import Path
 
 import warnings
 warnings.filterwarnings("ignore", category=FutureWarning)
@@ -337,7 +336,7 @@ if __name__ == "__main__":
             "Config optimal dari logistic_configs.json (jalankan logistic_config_search.py dulu)."
         ),
         epilog=(
-            "Alur kerja:\n"
+            "Alur kerja yang disarankan:\n"
             "  1. Riset config : python logistic_config_search.py\n"
             "  2. Prediksi     : python logistic_classifier.py --all\n"
             "  3. Backtest     : python logistic_classifier.py --ticker DMAS --backtest 30\n"

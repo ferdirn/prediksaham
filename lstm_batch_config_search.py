@@ -66,7 +66,7 @@ SEED           = 42
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 
-def set_seed(seed: int):
+def set_seed(seed: int) -> None:
     np.random.seed(seed)
     tf.random.set_seed(seed)
 
@@ -81,7 +81,7 @@ def load_configs() -> dict:
     return json.loads(path.read_text()) if path.exists() else {}
 
 
-def save_configs(configs: dict):
+def save_configs(configs: dict) -> None:
     Path(TICKER_CONFIGS).write_text(json.dumps(configs, indent=2))
 
 
@@ -99,7 +99,7 @@ def load_ticker_data(ticker: str) -> pd.DataFrame:
     return df
 
 
-def make_sequences(data: np.ndarray, lookback: int):
+def make_sequences(data: np.ndarray, lookback: int) -> tuple[np.ndarray, np.ndarray]:
     X, y = [], []
     for i in range(len(data) - lookback):
         X.append(data[i : i + lookback])
@@ -107,7 +107,7 @@ def make_sequences(data: np.ndarray, lookback: int):
     return np.array(X, dtype=np.float32), np.array(y, dtype=np.float32)
 
 
-def preprocess(df: pd.DataFrame, lookback: int):
+def preprocess(df: pd.DataFrame, lookback: int) -> tuple:
     raw   = df[FEATURES].values.astype(np.float32)
     split = int(len(raw) * TRAIN_SPLIT)
 
@@ -120,7 +120,7 @@ def preprocess(df: pd.DataFrame, lookback: int):
     return X_train, y_train, X_test, y_test, scaler
 
 
-def inverse_close(scaler, vals):
+def inverse_close(scaler, vals) -> np.ndarray:
     n = scaler.scale_.shape[0]
     dummy = np.zeros((len(vals), n), dtype=np.float32)
     dummy[:, 0] = vals
@@ -182,7 +182,7 @@ def train_and_eval(df: pd.DataFrame, lookback: int) -> dict | None:
     }
 
 
-def save_plot(ticker: str, df_res: pd.DataFrame):
+def save_plot(ticker: str, df_res: pd.DataFrame) -> None:
     best = df_res.loc[df_res["mape_pct"].idxmin()]
     fig, ax = plt.subplots(figsize=(12, 4))
     ax.plot(df_res["lookback"], df_res["mape_pct"], marker="o", markersize=3,
@@ -276,7 +276,7 @@ def search_ticker(ticker: str) -> dict | None:
 
 # ── main ──────────────────────────────────────────────────────────────────────
 
-def run(tickers: list, force: bool):
+def run(tickers: list, force: bool) -> None:
     configs  = load_configs()
     summary  = []
     t_total  = time.time()
@@ -324,11 +324,31 @@ def run(tickers: list, force: bool):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Batch lookback search for all watchlist tickers")
+        prog="lstm_batch_config_search.py",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=(
+            "Batch Lookback Search — LSTM\n"
+            "==============================\n"
+            "Menjalankan hyperparameter search (lookback 3–60) untuk semua ticker\n"
+            "di watchlist.txt. Best config per ticker disimpan ke lstm_configs.json.\n"
+            "Ticker yang sudah punya config di-skip (gunakan --force untuk re-run)."
+        ),
+        epilog=(
+            "Alur kerja yang disarankan:\n"
+            "  1. Download data      : python bei_stock_downloader.py --file watchlist.txt --years 5\n"
+            "  2. Riset config batch : python lstm_batch_config_search.py\n"
+            "  3. Prediksi batch     : python lstm_batch_predictor.py\n"
+            "\n"
+            "Contoh:\n"
+            "  python lstm_batch_config_search.py\n"
+            "  python lstm_batch_config_search.py --tickers ANTM CLEO\n"
+            "  python lstm_batch_config_search.py --force\n"
+        ),
+    )
     parser.add_argument("--tickers", nargs="+", default=None,
-                        help="Subset of tickers to search (default: all in watchlist.txt)")
+                        help="Subset ticker yang dicari (default: semua dari watchlist.txt)")
     parser.add_argument("--force", action="store_true",
-                        help="Re-run even if config already saved")
+                        help="Re-run meski config sudah tersimpan")
     args = parser.parse_args()
 
     tickers = args.tickers if args.tickers else read_watchlist()

@@ -5,7 +5,7 @@ Runs lstm_predictor for every ticker that has a saved config in lstm_configs.jso
 collects all forecasts, and prints a ranked summary table.
 
 Usage:
-    python lstm_batch_predict.py
+    python lstm_batch_predictor.py
 """
 
 import argparse
@@ -63,7 +63,7 @@ def load_data(ticker: str, features: list) -> pd.DataFrame:
     return df
 
 
-def make_sequences(data: np.ndarray, lookback: int):
+def make_sequences(data: np.ndarray, lookback: int) -> tuple[np.ndarray, np.ndarray]:
     X, y = [], []
     for i in range(len(data) - lookback):
         X.append(data[i : i + lookback])
@@ -162,7 +162,7 @@ def predict_ticker(ticker: str, cfg: dict) -> dict | None:
 
 # ── main ──────────────────────────────────────────────────────────────────────
 
-def run():
+def run() -> None:
     configs = load_configs()
     results = []
 
@@ -212,7 +212,7 @@ def run():
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        prog="lstm_batch_predict.py",
+        prog="lstm_batch_predictor.py",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description=(
             "BEI Batch Next-Day Prediction\n"
@@ -230,15 +230,58 @@ if __name__ == "__main__":
             "Alur kerja yang disarankan:\n"
             "  1. Download data    : python bei_stock_downloader.py --file watchlist.txt --years 5\n"
             "  2. Cari config      : python lstm_batch_config_search.py\n"
-            "  3. Jalankan prediksi: python lstm_batch_predict.py\n"
+            "  3. Jalankan prediksi: python lstm_batch_predictor.py\n"
+            "  4. Backtest         : python lstm_batch_predictor.py --backtest 30\n"
             "\n"
             "Output:\n"
             "  - Tabel prediksi di terminal (diurutkan dari potensi kenaikan tertinggi)\n"
             "  - predictions_YYYY-MM-DD.csv berisi semua hasil prediksi\n"
             "\n"
             "Contoh:\n"
-            "  python lstm_batch_predict.py\n"
+            "  python lstm_batch_predictor.py\n"
+            "  python lstm_batch_predictor.py --ticker BBCA\n"
+            "  python lstm_batch_predictor.py --ticker BBCA --backtest 30\n"
+            "  python lstm_batch_predictor.py --backtest 20\n"
         ),
     )
-    parser.parse_args()
-    run()
+    parser.add_argument("--ticker",   type=str, default=None,
+                        help="Ticker spesifik (default: semua ticker di lstm_configs.json)")
+    parser.add_argument("--backtest", type=int, default=None, metavar="N",
+                        help="Uji mundur N hari terakhir. Gunakan --ticker untuk satu ticker, "
+                             "atau tanpa --ticker untuk semua ticker di lstm_configs.json (lambat).")
+    args = parser.parse_args()
+
+    if args.backtest is not None:
+        from lstm_predictor import run_backtest as lstm_run_backtest
+        configs = load_configs()
+        tickers = [args.ticker.strip().upper()] if args.ticker else list(configs.keys())
+        results = []
+        for t in tickers:
+            r = lstm_run_backtest(t, args.backtest)
+            if r:
+                results.append(r)
+        if results and len(results) > 1:
+            import pandas as pd
+            df_sum = pd.DataFrame(results).sort_values("mape")
+            print(f"\n{'═'*65}")
+            print(f"  RINGKASAN BACKTEST LSTM — {args.backtest} hari")
+            print(f"{'═'*65}")
+            print(f"  {'Ticker':<8} {'MAPE':>7} {'Dir Acc':>9} {'Benar':>8} {'LB':>4}")
+            print(f"  {'─'*8} {'─'*7} {'─'*9} {'─'*8} {'─'*4}")
+            for _, r in df_sum.iterrows():
+                print(f"  {r['ticker']:<8} {r['mape']:>6.2f}%  {r['dir_acc']:>7.1f}%  "
+                      f"{r['n_benar']:>3}/{r['n_total']:<3}  {int(r['lookback']):>4}")
+            print(f"{'═'*65}\n")
+    elif args.ticker:
+        configs = load_configs()
+        cfg = configs.get(args.ticker.strip().upper())
+        if not cfg:
+            print(f"  Tidak ada config untuk '{args.ticker}' di {TICKER_CONFIGS}.")
+        else:
+            result = predict_ticker(args.ticker.strip().upper(), cfg)
+            if result:
+                print(f"\n  {result['ticker']}: IDR {result['last_close']:,.0f} → "
+                      f"{result['direction']} IDR {result['forecast']:,.0f} "
+                      f"({result['change_pct']:+.2f}%)  [MAPE {result['mape']:.2f}%]")
+    else:
+        run()

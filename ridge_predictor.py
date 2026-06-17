@@ -18,7 +18,6 @@ Usage:
 import argparse
 import sqlite3
 from datetime import date
-from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -164,7 +163,8 @@ def print_detail(r: dict) -> None:
 
 def run_backtest(ticker: str, n_days: int,
                  lookback_override: int | None = None,
-                 alpha_override: float | None = None) -> None:
+                 alpha_override: float | None = None,
+                 print_detail_rows: bool = True) -> dict | None:
     ticker = ticker.strip().upper()
     cfg    = load_config(ticker)
 
@@ -174,18 +174,17 @@ def run_backtest(ticker: str, n_days: int,
     df = load_data(ticker)
     if df.empty:
         print(f"  Ticker '{ticker}' tidak ditemukan di database.")
-        return
+        return None
 
     X_all, y_all = build_features(df, lookback)
     if len(X_all) < lookback + n_days + 10:
         print(f"  Data tidak cukup untuk backtest {n_days} hari.")
-        return
+        return None
 
     vol_cols = [c for c in X_all.columns if "volume" in c]
     rows = []
 
     for i in range(n_days, 0, -1):
-        # Gunakan data sampai hari ke -(i+1), prediksi hari ke -i
         X_train = X_all.iloc[:-i].copy()
         y_train = y_all.iloc[:-i]
 
@@ -195,7 +194,6 @@ def run_backtest(ticker: str, n_days: int,
         model = Ridge(alpha=alpha)
         model.fit(X_train, y_train)
 
-        # Fitur untuk hari yang diprediksi
         X_pred = X_all.iloc[[-i]].copy()
         X_pred[vol_cols] = scaler.transform(X_pred[vol_cols])
 
@@ -222,22 +220,27 @@ def run_backtest(ticker: str, n_days: int,
     result_df = pd.DataFrame(rows)
     mae      = result_df["Error"].abs().mean()
     dir_acc  = (result_df["Arah"] == "✓").mean() * 100
+    n_benar  = int((result_df["Arah"] == "✓").sum())
 
-    print(f"\n{'═'*80}")
-    print(f"  Backtest {ticker} — {n_days} hari terakhir  (lookback={lookback}, alpha={alpha})")
-    print(f"{'═'*80}")
-    print(f"  {'Tanggal':<12} {'Last Close':>11} {'Pred Ret':>9} {'Act Ret':>9} "
-          f"{'Error':>8} {'Pred Close':>11} {'Act Close':>10} {'Dir':>4}")
-    print(f"  {'─'*12} {'─'*11} {'─'*9} {'─'*9} {'─'*8} {'─'*11} {'─'*10} {'─'*4}")
-    for _, r in result_df.iterrows():
-        print(f"  {str(r['Tanggal']):<12} {r['Last Close']:>11,.0f} "
-              f"{r['Pred Return']:>+8.2f}% {r['Act Return']:>+8.2f}% "
-              f"{r['Error']:>+7.2f}% {r['Pred Close']:>11,.0f} "
-              f"{r['Act Close']:>10,.0f} {r['Arah']:>4}")
-    print(f"{'─'*80}")
-    print(f"  MAE: {mae:.4f}%   |   Akurasi arah: {dir_acc:.1f}%   |   "
-          f"Benar: {int(dir_acc * n_days / 100)}/{n_days} hari")
-    print(f"{'═'*80}\n")
+    if print_detail_rows:
+        print(f"\n{'═'*80}")
+        print(f"  Backtest {ticker} — {n_days} hari terakhir  (lookback={lookback}, alpha={alpha})")
+        print(f"{'═'*80}")
+        print(f"  {'Tanggal':<12} {'Last Close':>11} {'Pred Ret':>9} {'Act Ret':>9} "
+              f"{'Error':>8} {'Pred Close':>11} {'Act Close':>10} {'Dir':>4}")
+        print(f"  {'─'*12} {'─'*11} {'─'*9} {'─'*9} {'─'*8} {'─'*11} {'─'*10} {'─'*4}")
+        for _, r in result_df.iterrows():
+            print(f"  {str(r['Tanggal']):<12} {r['Last Close']:>11,.0f} "
+                  f"{r['Pred Return']:>+8.2f}% {r['Act Return']:>+8.2f}% "
+                  f"{r['Error']:>+7.2f}% {r['Pred Close']:>11,.0f} "
+                  f"{r['Act Close']:>10,.0f} {r['Arah']:>4}")
+        print(f"{'─'*80}")
+        print(f"  MAE: {mae:.4f}%   |   Akurasi arah: {dir_acc:.1f}%   |   "
+              f"Benar: {n_benar}/{len(rows)} hari")
+        print(f"{'═'*80}\n")
+
+    return {"ticker": ticker, "mae": round(mae, 4), "dir_acc": round(dir_acc, 1),
+            "n_benar": n_benar, "n_total": len(rows), "lookback": lookback, "alpha": alpha}
 
 
 def print_summary(results: list[dict]) -> None:

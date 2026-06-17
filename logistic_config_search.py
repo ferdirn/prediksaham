@@ -16,7 +16,7 @@ Target: 1 = besok naik (DayReturn_Pct > 0), 0 = turun/flat
 Hasil disimpan ke logistic_configs.json.
 
 Usage:
-    python logistic_config_search.py                        # semua ticker di DB
+    python logistic_config_search.py                           # semua ticker di watchlist.txt
     python logistic_config_search.py --tickers DMAS BBCA
     python logistic_config_search.py --lookbacks 1 3 5 7
 """
@@ -24,7 +24,6 @@ Usage:
 import argparse
 import sqlite3
 from datetime import date
-from pathlib import Path
 
 import warnings
 warnings.filterwarnings("ignore", category=FutureWarning)
@@ -36,7 +35,7 @@ from sklearn.model_selection import TimeSeriesSplit
 from sklearn.preprocessing import StandardScaler
 
 from logistic_classifier import build_features, load_jkse
-from utils import save_configs as _save_configs
+from utils import load_watchlist, save_configs as _save_configs
 
 SQLITE_PATH    = "bei_stocks.db"
 LR_CLS_CONFIGS = "logistic_configs.json"
@@ -142,18 +141,23 @@ if __name__ == "__main__":
             "Hasil disimpan ke logistic_configs.json."
         ),
         epilog=(
+            "Alur kerja yang disarankan:\n"
+            "  1. Riset config semua watchlist : python logistic_config_search.py\n"
+            "  2. Prediksi arah                : python logistic_classifier.py --all\n"
+            "  3. Backtest                     : python logistic_classifier.py --all --backtest 30\n"
+            "\n"
             "Contoh:\n"
-            "  python logistic_config_search.py\n"
+            "  python logistic_config_search.py                          # semua dari watchlist.txt\n"
             "  python logistic_config_search.py --tickers DMAS BBCA\n"
             "  python logistic_config_search.py --lookbacks 1 3 5 7 --c-values 0.1 1 10\n"
         ),
     )
-    parser.add_argument("--tickers",   nargs="+", help="Ticker spesifik (default: semua di DB)")
+    parser.add_argument("--tickers",   nargs="+", help="Ticker spesifik (default: semua dari watchlist.txt)")
     parser.add_argument("--lookbacks", nargs="+", type=int,   default=DEFAULT_LOOKBACKS, metavar="N")
     parser.add_argument("--c-values",  nargs="+", type=float, default=DEFAULT_C_VALUES,  metavar="C")
     args = parser.parse_args()
 
-    tickers = args.tickers or load_all_tickers()
+    tickers = args.tickers or load_watchlist()
     jkse    = load_jkse()
 
     print(f"\n{'═'*55}")
